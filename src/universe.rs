@@ -11,7 +11,7 @@ pub enum Preset {
 #[wasm_bindgen]
 pub struct Builder {
     boid_count: Option<u32>,
-    create_boid: Box<dyn Fn() -> Boid>,
+    create_boid: Box<dyn FnMut() -> Boid>,
 }
 
 #[wasm_bindgen]
@@ -29,12 +29,22 @@ impl Builder {
         self
     }
 
-    pub fn build(self) -> Universe {
+    pub fn build(mut self) -> Universe {
         let boid_count = self.boid_count.expect("Missing field: boid_count");
         Universe {
             boids: (0..boid_count).map(|_| (self.create_boid)()).collect(),
             create_boid: self.create_boid,
         }
+    }
+}
+
+impl Builder {
+    pub fn create_boid<F>(mut self, f: F) -> Self
+    where
+        F: FnMut() -> Boid + 'static,
+    {
+        self.create_boid = Box::new(f);
+        self
     }
 }
 
