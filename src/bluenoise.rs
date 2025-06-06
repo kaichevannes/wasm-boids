@@ -27,4 +27,11 @@ mod tests {
         assert_eq!(100, noise.by_ref().take(100).collect::<Vec<_>>().len());
         assert_eq!(1000, noise.by_ref().take(1000).collect::<Vec<_>>().len());
     }
+
+    #[test]
+    fn generated_numbers_are_different() {
+        let noise = BlueNoise::new();
+        let numbers = noise.take(2).collect::<Vec<_>>();
+        assert!(numbers.first() != numbers.last());
+    }
 }
