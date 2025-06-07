@@ -10,7 +10,7 @@ where
     fn insert(&mut self, point: &T);
     fn neighbors(&mut self, point: &T, radius: f32) -> Vec<T>;
     fn set_points(&mut self, points: Vec<&T>);
-    fn set_size(&mut self, size: f32);
+    fn resize(&mut self, size: f32);
 }
 
 pub struct NaiveGrid<T>
@@ -34,6 +34,13 @@ where
     }
 
     fn insert(&mut self, point: &T) {
+        let (x, y) = point.position();
+        if x < 0.0 || y < 0.0 || x > self.grid_size || y > self.grid_size {
+            panic!(
+                "Cannot insert ({x},{y}) into grid with size {}",
+                self.grid_size
+            );
+        }
         self.points.push(point.clone());
     }
 
@@ -63,7 +70,7 @@ where
         points.iter().for_each(|p| self.insert(p));
     }
 
-    fn set_size(&mut self, size: f32) {
+    fn resize(&mut self, size: f32) {
         self.grid_size = size;
     }
 }
@@ -111,6 +118,31 @@ mod tests {
             vec![p1.clone(), p3.clone(), p4.clone()],
             grid.neighbors(&p2, 3.0)
         );
-        assert_eq!(vec![] as Vec<Point>, grid.neighbors(&p7, 50.0))
+        assert_eq!(vec![] as Vec<Point>, grid.neighbors(&p7, 50.0));
+        assert_eq!(
+            vec![
+                p1.clone(),
+                p2.clone(),
+                p3.clone(),
+                p4.clone(),
+                p6.clone(),
+                p7.clone()
+            ],
+            grid.neighbors(&p5, 200.0)
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_insert_point_outside_of_grid() {
+        let mut grid = NaiveGrid::new(1.0);
+        grid.insert(&Point(2.0, 2.0));
+    }
+
+    #[test]
+    #[should_panic]
+    fn cannot_insert_negative_point() {
+        let mut grid = NaiveGrid::new(1.0);
+        grid.insert(&Point(-1.0, -1.0));
     }
 }
