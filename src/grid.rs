@@ -1,5 +1,6 @@
 pub trait Positioned {
     fn position(&self) -> (f32, f32);
+    fn set_position(&mut self, p1: f32, p2: f32);
 }
 
 trait Grid<T>
@@ -71,6 +72,11 @@ where
     }
 
     fn resize(&mut self, size: f32) {
+        let resize_factor = size / self.grid_size;
+        self.points.iter_mut().for_each(|p| {
+            let (x, y) = p.position();
+            p.set_position(x * resize_factor, y * resize_factor);
+        });
         self.grid_size = size;
     }
 }
@@ -85,6 +91,11 @@ mod tests {
     impl Positioned for Point {
         fn position(&self) -> (f32, f32) {
             (self.0, self.1)
+        }
+
+        fn set_position(&mut self, p1: f32, p2: f32) {
+            self.0 = p1;
+            self.1 = p2;
         }
     }
 
@@ -144,5 +155,42 @@ mod tests {
     fn cannot_insert_negative_point() {
         let mut grid = NaiveGrid::new(1.0);
         grid.insert(&Point(-1.0, -1.0));
+    }
+
+    #[test]
+    fn resizing_maintains_point_positions_relative_to_size() {
+        let mut grid = NaiveGrid::new(10.0);
+        grid.insert(&Point(0.0, 0.0));
+        grid.insert(&Point(0.0, 10.0));
+        grid.insert(&Point(10.0, 0.0));
+        grid.insert(&Point(10.0, 10.0));
+        grid.insert(&Point(5.0, 5.0));
+        grid.insert(&Point(2.7, 3.2));
+        grid.resize(100.0);
+        assert_eq!(
+            vec![
+                Point(0.0, 0.0),
+                Point(0.0, 100.0),
+                Point(100.0, 0.0),
+                Point(100.0, 100.0),
+                Point(50.0, 50.0),
+                Point(27.0, 32.0)
+            ],
+            // Random different point to get the whole grid.
+            grid.neighbors(&Point(1.0, 1.0), 500.0)
+        );
+        grid.resize(50.0);
+        assert_eq!(
+            vec![
+                Point(0.0, 0.0),
+                Point(0.0, 50.0),
+                Point(50.0, 0.0),
+                Point(50.0, 50.0),
+                Point(25.0, 25.0),
+                Point(13.5, 16.0)
+            ],
+            // Random different point to get the whole grid.
+            grid.neighbors(&Point(1.0, 1.0), 500.0)
+        );
     }
 }
