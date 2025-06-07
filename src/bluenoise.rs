@@ -1,3 +1,5 @@
+/// [Fast Poisson Disk Sampling in Arbitrary Dimenisions, Bridson 2007](https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph07-poissondisk.pdf)
+///
 pub struct BlueNoise;
 
 impl BlueNoise {
