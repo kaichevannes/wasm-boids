@@ -1,83 +1,84 @@
-pub trait Positioned {
-    fn position(&self) -> (f32, f32);
-    fn set_position(&mut self, p1: f32, p2: f32);
+pub trait Point {
+    fn xy(&self) -> (f32, f32);
+    fn set_xy(&mut self, x: f32, y: f32);
 }
 
-trait Grid<T>
+pub trait Grid<'a, T>
 where
-    T: Positioned + Clone,
+    T: Point,
 {
-    fn new(grid_size: f32) -> Self;
-    fn insert(&mut self, point: &T);
-    fn neighbors(&mut self, point: &T, radius: f32) -> Vec<T>;
-    fn set_points(&mut self, points: Vec<&T>);
-    fn resize(&mut self, size: f32);
+    fn insert<'b: 'a>(&mut self, point: &'b T);
+    fn neighbors(&self, point: &T, radius: f32) -> Vec<&T>;
+    fn get_points(&self) -> &[&T];
+    fn set_points<'b: 'a>(&mut self, points: Vec<&'b T>);
+    fn get_size(&self) -> f32;
 }
 
-pub struct NaiveGrid<T>
+pub struct NaiveGrid<'a, T>
 where
-    T: Positioned + Clone,
+    T: Point,
 {
-    points: Vec<T>,
+    points: Vec<&'a T>,
     /// The width/height of the square grid.
     grid_size: f32,
 }
 
-impl<T> Grid<T> for NaiveGrid<T>
+impl<'a, T> NaiveGrid<'a, T>
 where
-    T: Positioned + Clone,
+    T: Point,
 {
-    fn new(grid_size: f32) -> Self {
+    pub fn new(grid_size: f32) -> Self {
         NaiveGrid {
             points: vec![],
             grid_size,
         }
     }
+}
 
-    fn insert(&mut self, point: &T) {
-        let (x, y) = point.position();
+impl<'a, T> Grid<'a, T> for NaiveGrid<'a, T>
+where
+    T: Point + Clone,
+{
+    fn insert<'b: 'a>(&mut self, point: &'b T) {
+        let (x, y) = point.xy();
         if x < 0.0 || y < 0.0 || x > self.grid_size || y > self.grid_size {
             panic!(
                 "Cannot insert ({x},{y}) into grid with size {}",
                 self.grid_size
             );
         }
-        self.points.push(point.clone());
+        self.points.push(point);
     }
 
-    fn neighbors(&mut self, point: &T, radius: f32) -> Vec<T> {
-        // point (the function arg) is vector a, every other point in self.points is vector b
-        // a is a neighbor of b if (bx - ax)^2 + (by - ay)^2 <= radius^2
-        // i.e. the distance between them is less than the radius
-        //
-        // this works because sqrt((bx - ax)^2 + (by - ay)^2) <= radius all squared is the
-        // expression above, saving a sqrt operation.
-        let (ax, ay) = point.position();
+    fn neighbors(&self, point: &T, radius: f32) -> Vec<&T> {
+        let (ax, ay) = point.xy();
         self.points
             .iter()
+            .copied()
             .filter(|b| {
-                if b.position() == (ax, ay) {
+                if b.xy() == (ax, ay) {
                     return false;
                 }
-                let (bx, by) = b.position();
-                (bx - ax).powi(2) + (by - ay).powi(2) <= radius.powi(2)
+                let (bx, by) = b.xy();
+                let dx = f32::min((bx - ax).abs(), self.grid_size - (bx - ax).abs());
+                let dy = f32::min((by - ay).abs(), self.grid_size - (by - ay).abs());
+
+                dx.powi(2) + dy.powi(2) <= radius.powi(2)
             })
-            .cloned()
             .collect()
     }
 
-    fn set_points(&mut self, points: Vec<&T>) {
-        self.points.clear();
-        points.iter().for_each(|p| self.insert(p));
+    fn get_size(&self) -> f32 {
+        self.grid_size
     }
 
-    fn resize(&mut self, size: f32) {
-        let resize_factor = size / self.grid_size;
-        self.points.iter_mut().for_each(|p| {
-            let (x, y) = p.position();
-            p.set_position(x * resize_factor, y * resize_factor);
-        });
-        self.grid_size = size;
+    fn get_points(&self) -> &[&T] {
+        &self.points
+    }
+
+    fn set_points<'b: 'a>(&mut self, points: Vec<&'b T>) {
+        self.points.clear();
+        points.iter().for_each(|p| self.insert(p));
     }
 }
 
@@ -86,14 +87,14 @@ mod tests {
     use crate::grid::*;
 
     #[derive(Debug, PartialEq, Clone)]
-    struct Point(f32, f32);
+    struct TestPoint(f32, f32);
 
-    impl Positioned for Point {
-        fn position(&self) -> (f32, f32) {
+    impl Point for TestPoint {
+        fn xy(&self) -> (f32, f32) {
             (self.0, self.1)
         }
 
-        fn set_position(&mut self, p1: f32, p2: f32) {
+        fn set_xy(&mut self, p1: f32, p2: f32) {
             self.0 = p1;
             self.1 = p2;
         }
@@ -102,95 +103,67 @@ mod tests {
     #[test]
     fn detects_neighbors() {
         let mut grid = NaiveGrid::new(100.0);
-        let p1 = Point(0.0, 0.0);
-        let p2 = Point(1.0, 0.0);
+        let p1 = TestPoint(0.0, 0.0);
+        let p2 = TestPoint(1.0, 0.0);
         grid.insert(&p1);
         grid.insert(&p2);
         assert_eq!(1, grid.neighbors(&p1, 1.0).len());
-        assert_eq!(&p2, grid.neighbors(&p1, 1.0).first().unwrap());
-        assert_eq!(&p1, grid.neighbors(&p2, 1.0).first().unwrap());
+        assert_eq!(vec![&p2], grid.neighbors(&p1, 1.0));
+        assert_eq!(vec![&p1], grid.neighbors(&p2, 1.0));
 
-        let p3 = Point(0.0, 1.0);
-        let p4 = Point(0.0, 2.0);
+        let p3 = TestPoint(0.0, 1.0);
+        let p4 = TestPoint(0.0, 2.0);
         grid.set_points(vec![&p3, &p4]);
-        assert_eq!(&p4, grid.neighbors(&p3, 1.0).first().unwrap());
-        assert_eq!(&p3, grid.neighbors(&p4, 1.0).first().unwrap());
+        assert_eq!(vec![&p4], grid.neighbors(&p3, 1.0));
+        assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
 
-        let p5 = Point(12.5, 12.5);
-        let p6 = Point(13.0, 13.0);
+        let p5 = TestPoint(12.5, 12.5);
+        let p6 = TestPoint(13.0, 13.0);
         grid.set_points(vec![&p5, &p6]);
-        assert_eq!(&p6, grid.neighbors(&p5, 1.0).first().unwrap());
-        assert_eq!(&p5, grid.neighbors(&p6, 1.0).first().unwrap());
+        assert_eq!(vec![&p6], grid.neighbors(&p5, 1.0));
+        assert_eq!(vec![&p5], grid.neighbors(&p6, 1.0));
 
-        let p7 = Point(100.0, 100.0);
+        let p7 = TestPoint(50.0, 50.0);
         grid.set_points(vec![&p1, &p2, &p3, &p4, &p5, &p6, &p7]);
-        assert_eq!(vec![p2.clone(), p3.clone()], grid.neighbors(&p1, 1.0));
+        assert_eq!(vec![&p2, &p3], grid.neighbors(&p1, 1.0));
+        assert_eq!(vec![&p1, &p3, &p4], grid.neighbors(&p2, 3.0));
+        assert!(grid.neighbors(&p7, 30.0).is_empty());
         assert_eq!(
-            vec![p1.clone(), p3.clone(), p4.clone()],
-            grid.neighbors(&p2, 3.0)
-        );
-        assert_eq!(vec![] as Vec<Point>, grid.neighbors(&p7, 50.0));
-        assert_eq!(
-            vec![
-                p1.clone(),
-                p2.clone(),
-                p3.clone(),
-                p4.clone(),
-                p6.clone(),
-                p7.clone()
-            ],
+            vec![&p1, &p2, &p3, &p4, &p6, &p7],
             grid.neighbors(&p5, 200.0)
         );
+    }
+
+    #[test]
+    fn detects_neighbors_wrapping_around_the_grid() {
+        let mut grid = NaiveGrid::new(10.0);
+        // Left/right wrapping
+        let p1 = TestPoint(1.0, 5.0);
+        let p2 = TestPoint(9.0, 5.0);
+        grid.insert(&p1);
+        grid.insert(&p2);
+        assert_eq!(vec![&p2], grid.neighbors(&p1, 2.0));
+        assert_eq!(vec![&p1], grid.neighbors(&p2, 2.0));
+
+        // Top/bottom wrapping
+        let p3 = TestPoint(5.0, 9.0);
+        let p4 = TestPoint(5.0, 1.0);
+        grid.set_points(vec![&p1, &p2]);
+        assert_eq!(vec![&p4], grid.neighbors(&p3, 2.0));
+        assert_eq!(vec![&p3], grid.neighbors(&p4, 2.0));
     }
 
     #[test]
     #[should_panic]
     fn cannot_insert_point_outside_of_grid() {
         let mut grid = NaiveGrid::new(1.0);
-        grid.insert(&Point(2.0, 2.0));
+        grid.insert(&TestPoint(2.0, 2.0));
     }
 
     #[test]
     #[should_panic]
     fn cannot_insert_negative_point() {
         let mut grid = NaiveGrid::new(1.0);
-        grid.insert(&Point(-1.0, -1.0));
-    }
-
-    #[test]
-    fn resizing_maintains_point_positions_relative_to_size() {
-        let mut grid = NaiveGrid::new(10.0);
-        grid.insert(&Point(0.0, 0.0));
-        grid.insert(&Point(0.0, 10.0));
-        grid.insert(&Point(10.0, 0.0));
-        grid.insert(&Point(10.0, 10.0));
-        grid.insert(&Point(5.0, 5.0));
-        grid.insert(&Point(2.7, 3.2));
-        grid.resize(100.0);
-        assert_eq!(
-            vec![
-                Point(0.0, 0.0),
-                Point(0.0, 100.0),
-                Point(100.0, 0.0),
-                Point(100.0, 100.0),
-                Point(50.0, 50.0),
-                Point(27.0, 32.0)
-            ],
-            // Random different point to get the whole grid.
-            grid.neighbors(&Point(1.0, 1.0), 500.0)
-        );
-        grid.resize(50.0);
-        assert_eq!(
-            vec![
-                Point(0.0, 0.0),
-                Point(0.0, 50.0),
-                Point(50.0, 0.0),
-                Point(50.0, 50.0),
-                Point(25.0, 25.0),
-                Point(13.5, 16.0)
-            ],
-            // Random different point to get the whole grid.
-            grid.neighbors(&Point(1.0, 1.0), 500.0)
-        );
+        grid.insert(&TestPoint(-1.0, -1.0));
     }
 }
