@@ -9,7 +9,7 @@ where
     fn insert<'b: 'a>(&mut self, point: &'b T);
     fn neighbors(&self, point: &dyn Point, radius: f32) -> Vec<&T>;
     fn get_points(&self) -> &[&T];
-    fn set_points<'b: 'a>(&mut self, points: Vec<&'b T>);
+    fn set_points<'b: 'a>(&mut self, points: &[&'b T]);
     fn get_size(&self) -> f32;
 }
 
@@ -77,7 +77,7 @@ where
         &self.points
     }
 
-    fn set_points<'b: 'a>(&mut self, points: Vec<&'b T>) {
+    fn set_points<'b: 'a>(&mut self, points: &[&'b T]) {
         self.points.clear();
         points.iter().for_each(|p| self.insert(p));
     }
@@ -109,18 +109,18 @@ mod tests {
 
         let p3 = TestPoint(0.0, 1.0);
         let p4 = TestPoint(0.0, 2.0);
-        grid.set_points(vec![&p3, &p4]);
+        grid.set_points(&vec![&p3, &p4]);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 1.0));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
 
         let p5 = TestPoint(12.5, 12.5);
         let p6 = TestPoint(13.0, 13.0);
-        grid.set_points(vec![&p5, &p6]);
+        grid.set_points(&vec![&p5, &p6]);
         assert_eq!(vec![&p6], grid.neighbors(&p5, 1.0));
         assert_eq!(vec![&p5], grid.neighbors(&p6, 1.0));
 
         let p7 = TestPoint(50.0, 50.0);
-        grid.set_points(vec![&p1, &p2, &p3, &p4, &p5, &p6, &p7]);
+        grid.set_points(&vec![&p1, &p2, &p3, &p4, &p5, &p6, &p7]);
         assert_eq!(vec![&p2, &p3], grid.neighbors(&p1, 1.0));
         assert_eq!(vec![&p1, &p3, &p4], grid.neighbors(&p2, 3.0));
         assert!(grid.neighbors(&p7, 30.0).is_empty());
@@ -144,7 +144,7 @@ mod tests {
         // Top/bottom wrapping
         let p3 = TestPoint(5.0, 9.0);
         let p4 = TestPoint(5.0, 1.0);
-        grid.set_points(vec![&p3, &p4]);
+        grid.set_points(&vec![&p3, &p4]);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 2.0));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 2.0));
     }
@@ -161,7 +161,7 @@ mod tests {
 
         let p3 = TestPoint(0.0, 0.0);
         let p4 = TestPoint(0.0, 0.0);
-        grid.set_points(vec![&p3, &p4]);
+        grid.set_points(&vec![&p3, &p4]);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 1.0));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
     }

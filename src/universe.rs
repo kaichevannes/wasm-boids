@@ -34,11 +34,11 @@ impl BoidFactory for BlueNoiseBoidFactory {
         });
 
         let mut new_position_grid = NaiveGrid::new(grid.get_size());
-        new_position_grid.set_points(existing_positions.iter().collect());
+        new_position_grid.set_points(&existing_positions.iter().collect::<Vec<&Sample>>());
         let mut new_velocities_grid = NaiveGrid::new(grid.get_size());
-        new_velocities_grid.set_points(existing_velocities.iter().collect());
+        new_velocities_grid.set_points(&existing_velocities.iter().collect::<Vec<&Sample>>());
         let mut new_accelerations_grid = NaiveGrid::new(grid.get_size());
-        new_accelerations_grid.set_points(existing_accelerations.iter().collect());
+        new_accelerations_grid.set_points(&existing_accelerations.iter().collect::<Vec<&Sample>>());
 
         let new_positions = self.noise.generate(&new_position_grid, number_of_boids);
         let new_velocities = self.noise.generate(&new_velocities_grid, number_of_boids);
@@ -156,8 +156,22 @@ impl Universe {
 
 #[cfg(test)]
 mod tests {
+    use crate::universe::BoidFactory;
     use crate::{boid::Boid, *};
     use std::collections::VecDeque;
+
+    struct TestBoidFactory {
+        boids: Vec<Boid>,
+    }
+
+    impl BoidFactory for TestBoidFactory {
+        fn create_n(&mut self, grid: &dyn grid::Grid<Boid>, number_of_boids: u32) -> Vec<Boid> {
+            let mut result = Vec::new();
+            (0..number_of_boids)
+                .map(|_| result.push(self.boids.pop().expect("No more test boids in self.boids")));
+            result
+        }
+    }
 
     #[test]
     fn builds_with_expected_number_of_boids() {
@@ -178,33 +192,32 @@ mod tests {
         assert_eq!(100, universe_with_one_hundred_boids.get_boids().len());
     }
 
-    // #[test]
-    // fn builds_with_expected_boid_values() {
-    //     let boids: Vec<Boid> = (0..3)
-    //         .map(|n| {
-    //             let x = n as f32;
-    //             Boid {
-    //                 position: (x, x),
-    //                 velocity: (x, x),
-    //                 acceleration: (x, x),
-    //             }
-    //         })
-    //         .collect();
-    //     let universe = universe::Builder::from_preset(universe::Preset::Basic)
-    //         .number_of_boids(boids.len() as u32)
-    //         .create_boid({
-    //             let mut boids_copy: VecDeque<Boid> = boids.clone().into();
-    //             move || boids_copy.pop_front().unwrap()
-    //         })
-    //         .build();
-    //     assert!(
-    //         universe
-    //             .get_boids()
-    //             .iter()
-    //             .zip(boids.iter())
-    //             .all(|(expected, actual)| expected.position == actual.position)
-    //     )
-    // }
+    #[test]
+    fn builds_with_expected_boid_values() {
+        let boids: Vec<Boid> = (0..3)
+            .map(|n| {
+                let x = n as f32;
+                Boid {
+                    position: (x, x),
+                    velocity: (x, x),
+                    acceleration: (x, x),
+                }
+            })
+            .collect();
+        let universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(boids.len() as u32)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: boids.clone(),
+            }))
+            .build();
+        assert!(
+            universe
+                .get_boids()
+                .iter()
+                .zip(boids.iter())
+                .all(|(expected, actual)| expected.position == actual.position)
+        )
+    }
 
     #[test]
     fn tick_changes_boid_positions() {
