@@ -1,6 +1,5 @@
 pub trait Point {
     fn xy(&self) -> (f32, f32);
-    fn set_xy(&mut self, x: f32, y: f32);
 }
 
 pub trait Grid<'a, T>
@@ -8,7 +7,7 @@ where
     T: Point,
 {
     fn insert<'b: 'a>(&mut self, point: &'b T);
-    fn neighbors(&self, point: &T, radius: f32) -> Vec<&T>;
+    fn neighbors(&self, point: &dyn Point, radius: f32) -> Vec<&T>;
     fn get_points(&self) -> &[&T];
     fn set_points<'b: 'a>(&mut self, points: Vec<&'b T>);
     fn get_size(&self) -> f32;
@@ -37,7 +36,7 @@ where
 
 impl<'a, T> Grid<'a, T> for NaiveGrid<'a, T>
 where
-    T: Point + Clone,
+    T: Point,
 {
     fn insert<'b: 'a>(&mut self, point: &'b T) {
         let (x, y) = point.xy();
@@ -50,13 +49,15 @@ where
         self.points.push(point);
     }
 
-    fn neighbors(&self, point: &T, radius: f32) -> Vec<&T> {
+    fn neighbors(&self, point: &dyn Point, radius: f32) -> Vec<&T> {
         let (ax, ay) = point.xy();
+        let mut found_self = false;
         self.points
             .iter()
             .copied()
             .filter(|b| {
-                if b.xy() == (ax, ay) {
+                if b.xy() == (ax, ay) && !found_self {
+                    found_self = true;
                     return false;
                 }
                 let (bx, by) = b.xy();
@@ -92,11 +93,6 @@ mod tests {
     impl Point for TestPoint {
         fn xy(&self) -> (f32, f32) {
             (self.0, self.1)
-        }
-
-        fn set_xy(&mut self, p1: f32, p2: f32) {
-            self.0 = p1;
-            self.1 = p2;
         }
     }
 
@@ -148,9 +144,26 @@ mod tests {
         // Top/bottom wrapping
         let p3 = TestPoint(5.0, 9.0);
         let p4 = TestPoint(5.0, 1.0);
-        grid.set_points(vec![&p1, &p2]);
+        grid.set_points(vec![&p3, &p4]);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 2.0));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 2.0));
+    }
+
+    #[test]
+    fn detects_neighbor_of_duplicated_point() {
+        let mut grid = NaiveGrid::new(10.0);
+        let p1 = TestPoint(2.0, 2.0);
+        let p2 = TestPoint(2.0, 2.0);
+        grid.insert(&p1);
+        grid.insert(&p1);
+        assert_eq!(vec![&p2], grid.neighbors(&p1, 1.0));
+        assert_eq!(vec![&p1], grid.neighbors(&p2, 1.0));
+
+        let p3 = TestPoint(0.0, 0.0);
+        let p4 = TestPoint(0.0, 0.0);
+        grid.set_points(vec![&p3, &p4]);
+        assert_eq!(vec![&p4], grid.neighbors(&p3, 1.0));
+        assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
     }
 
     #[test]
