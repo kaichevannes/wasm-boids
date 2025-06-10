@@ -2,6 +2,22 @@ use std::ops::{Add, Div, Mul, Sub};
 
 use crate::grid::Point;
 
+#[derive(Clone, Debug, Copy)]
+pub struct Boid {
+    pub position: Vec2,
+    pub velocity: Vec2,
+    pub acceleration: Vec2,
+}
+
+impl Point for Boid {
+    fn xy(&self) -> (f32, f32) {
+        (self.position.0, self.position.1)
+    }
+    fn set_xy(&mut self, x: f32, y: f32) {
+        self.position = Vec2(x, y);
+    }
+}
+
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub struct Vec2(pub f32, pub f32);
 
@@ -56,21 +72,5 @@ impl Div<usize> for Vec2 {
     type Output = Vec2;
     fn div(self, rhs: usize) -> Self::Output {
         self / rhs as f32
-    }
-}
-
-#[derive(Clone, Debug, Copy)]
-pub struct Boid {
-    pub position: Vec2,
-    pub velocity: Vec2,
-    pub acceleration: Vec2,
-}
-
-impl Point for Boid {
-    fn xy(&self) -> (f32, f32) {
-        (self.position.0, self.position.1)
-    }
-    fn set_xy(&mut self, x: f32, y: f32) {
-        self.position = Vec2(x, y);
     }
 }
