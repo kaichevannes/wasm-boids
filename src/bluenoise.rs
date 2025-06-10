@@ -12,6 +12,10 @@ impl Point for Sample {
     fn xy(&self) -> (f32, f32) {
         (self.0, self.1)
     }
+    fn set_xy(&mut self, x: f32, y: f32) {
+        self.0 = x;
+        self.1 = y;
+    }
 }
 
 /// [Fast Poisson Disk Sampling in Arbitrary Dimenisions, Bridson 2007](https://www.cs.ubc.ca/~rbridson/docs/bridson-siggraph07-poissondisk.pdf)
