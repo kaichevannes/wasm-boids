@@ -294,7 +294,8 @@ impl Universe {
         for boid in self.grid.get_points().iter() {
             let acceleration = boid.acceleration
                 + self.attraction_acceleration(boid) * self.attraction_weighting
-                + self.alignment_acceleration(boid) * self.alignment_weighting;
+                + self.alignment_acceleration(boid) * self.alignment_weighting
+                + self.separation_acceleration(boid) * self.separation_weighting;
             // should be normalised, or bounded by a max velocity.
             let velocity = boid.velocity + acceleration;
             // make sure still in bounds of the grid.
@@ -339,6 +340,19 @@ impl Universe {
             .fold(Vec2(0.0, 0.0), |acc, n| acc + n.velocity);
         let average_velocity = total_velocity / neighbors.len();
         average_velocity - boid.velocity
+    }
+
+    fn separation_acceleration(&self, boid: &Boid) -> Vec2 {
+        let neighbors = self.grid.neighbors(boid, self.attraction_radius);
+        if neighbors.is_empty() {
+            return Vec2(0.0, 0.0);
+        }
+
+        let total_position = neighbors.iter().fold(Vec2(0.0, 0.0), |acc, n| {
+            acc + self.wrapped_position(boid.position, n.position)
+        });
+        let average_position = total_position / neighbors.len();
+        boid.position - average_position
     }
 
     fn wrapped_position(&self, starting: Vec2, other: Vec2) -> Vec2 {
