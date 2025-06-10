@@ -123,29 +123,20 @@ impl Universe {
     }
 
     fn wrapped_position(&self, starting: Vec2, other: Vec2) -> Vec2 {
-        let grid_size = self.grid.get_size();
         let (x1, y1) = starting.into();
         let (x2, y2) = other.into();
 
-        let result_x;
-        if x2 - x1 > grid_size / 2.0 {
-            result_x = x2 - grid_size;
-        } else if x2 - x1 < -grid_size / 2.0 {
-            result_x = x2 + grid_size;
-        } else {
-            result_x = x2;
-        }
+        let adjusted_axis = |n1: f32, n2: f32| {
+            let grid_size = self.grid.get_size();
+            if n2 - n1 > grid_size / 2.0 {
+                return n2 - grid_size;
+            } else if n2 - x1 < -grid_size / 2.0 {
+                return n2 + grid_size;
+            }
+            n2
+        };
 
-        let result_y;
-        if y2 - y1 > grid_size / 2.0 {
-            result_y = y2 - grid_size;
-        } else if y2 - y1 < -grid_size / 2.0 {
-            result_y = y2 + grid_size;
-        } else {
-            result_y = y2;
-        }
-
-        Vec2(result_x, result_y)
+        Vec2(adjusted_axis(x1, x2), adjusted_axis(y1, y2))
     }
 }
 
@@ -154,7 +145,6 @@ mod tests {
     use std::collections::VecDeque;
 
     use crate::boid::Vec2;
-    use crate::grid::Point;
     use crate::universe::BoidFactory;
     use crate::{boid::Boid, *};
 
