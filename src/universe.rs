@@ -292,11 +292,12 @@ impl Universe {
     pub fn tick(&mut self) {
         let mut boids = Vec::new();
         for boid in self.grid.get_points().iter() {
-            let attraction_acceleration = self.attraction_acceleration(boid);
-            let acceleration =
-                boid.acceleration + attraction_acceleration * self.attraction_weighting;
+            let acceleration = boid.acceleration
+                + self.attraction_acceleration(boid) * self.attraction_weighting
+                + self.alignment_acceleration(boid) * self.alignment_weighting;
             // should be normalised, or bounded by a max velocity.
             let velocity = boid.velocity + acceleration;
+            // make sure still in bounds of the grid.
             let position = boid.position + velocity;
 
             boids.push(Boid {
@@ -315,12 +316,55 @@ impl Universe {
     }
 
     fn attraction_acceleration(&self, boid: &Boid) -> Vec2 {
-        let attraction_neighbors = self.grid.neighbors(boid, self.attraction_radius);
-        let total_position = attraction_neighbors
-            .iter()
-            .fold(Vec2(0.0, 0.0), |acc, n| acc + n.position);
-        let average_position = total_position / attraction_neighbors.len();
+        let neighbors = self.grid.neighbors(boid, self.attraction_radius);
+        if neighbors.is_empty() {
+            return Vec2(0.0, 0.0);
+        }
+
+        let total_position = neighbors.iter().fold(Vec2(0.0, 0.0), |acc, n| {
+            acc + self.wrapped_position(boid.position, n.position)
+        });
+        let average_position = total_position / neighbors.len();
         average_position - boid.position
+    }
+
+    fn alignment_acceleration(&self, boid: &Boid) -> Vec2 {
+        let neighbors = self.grid.neighbors(boid, self.alignment_radius);
+        if neighbors.is_empty() {
+            return Vec2(0.0, 0.0);
+        }
+
+        let total_velocity = neighbors
+            .iter()
+            .fold(Vec2(0.0, 0.0), |acc, n| acc + n.velocity);
+        let average_velocity = total_velocity / neighbors.len();
+        average_velocity - boid.velocity
+    }
+
+    fn wrapped_position(&self, starting: Vec2, other: Vec2) -> Vec2 {
+        let grid_size = self.grid.get_size();
+        let (x1, y1) = starting.into();
+        let (x2, y2) = other.into();
+
+        let result_x;
+        if x2 - x1 > grid_size / 2.0 {
+            result_x = x2 - grid_size;
+        } else if x2 - x1 < -grid_size / 2.0 {
+            result_x = x2 + grid_size;
+        } else {
+            result_x = x2;
+        }
+
+        let result_y;
+        if y2 - y1 > grid_size / 2.0 {
+            result_y = y2 - grid_size;
+        } else if y2 - y1 < -grid_size / 2.0 {
+            result_y = y2 + grid_size;
+        } else {
+            result_y = y2;
+        }
+
+        Vec2(result_x, result_y)
     }
 }
 
@@ -475,6 +519,34 @@ mod tests {
         let (x2, _) = boids.last().unwrap().xy();
         assert!(x1 > 1.0);
         assert!(x2 < 2.0);
+
+        let b3 = Boid {
+            position: Vec2(6.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b4 = Boid {
+            position: Vec2(6.0, 4.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(1)
+            .alignment_weighting(0)
+            .separation_weighting(0)
+            .attraction_radius(1.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b3, b4].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let (_, y1) = boids.first().unwrap().xy();
+        let (_, y2) = boids.last().unwrap().xy();
+        assert!(y1 < 5.0);
+        assert!(y2 > 4.0);
     }
 
     #[test]
@@ -495,7 +567,7 @@ mod tests {
             .attraction_weighting(1)
             .alignment_weighting(0)
             .separation_weighting(0)
-            .attraction_radius(1.0)
+            .attraction_radius(2.0)
             .boid_factory(Box::new(TestBoidFactory {
                 boids: vec![b1, b2].into(),
             }))
@@ -506,5 +578,185 @@ mod tests {
         let (_, y2) = boids.last().unwrap().xy();
         assert!(y1 > 9.0);
         assert!(y2 < 1.0);
+
+        let b3 = Boid {
+            position: Vec2(1.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b4 = Boid {
+            position: Vec2(9.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(1)
+            .alignment_weighting(0)
+            .separation_weighting(0)
+            .attraction_radius(2.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b3, b4].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let (x1, _) = boids.first().unwrap().xy();
+        let (x2, _) = boids.last().unwrap().xy();
+        assert!(x1 < 1.0);
+        assert!(x2 > 9.0);
+
+        let b5 = Boid {
+            position: Vec2(1.0, 9.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b6 = Boid {
+            position: Vec2(9.0, 1.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(1)
+            .alignment_weighting(0)
+            .separation_weighting(0)
+            .attraction_radius(3.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b5, b6].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let (x1, y1) = boids.first().unwrap().xy();
+        let (x2, y2) = boids.last().unwrap().xy();
+        assert!(x1 < 1.0 && y1 > 9.0);
+        assert!(x2 > 9.0 && y2 < 1.0);
+    }
+
+    #[test]
+    fn boids_next_to_each_other_are_aligned() {
+        let b1 = Boid {
+            position: Vec2(1.0, 1.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b2 = Boid {
+            position: Vec2(2.0, 1.0),
+            velocity: Vec2(1.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(0)
+            .alignment_weighting(1)
+            .separation_weighting(0)
+            .alignment_radius(1.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b1, b2].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let Vec2(x1, y1) = boids.first().unwrap().velocity;
+        let Vec2(x2, y2) = boids.last().unwrap().velocity;
+        assert!(x1 > 0.0 && y1 == 0.0);
+        assert!(x2 < 1.0 && y2 == 0.0);
+
+        let b3 = Boid {
+            position: Vec2(1.0, 1.0),
+            velocity: Vec2(0.0, 1.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b4 = Boid {
+            position: Vec2(2.0, 1.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(0)
+            .alignment_weighting(1)
+            .separation_weighting(0)
+            .alignment_radius(1.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b3, b4].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let Vec2(x1, y1) = boids.first().unwrap().velocity;
+        let Vec2(x2, y2) = boids.last().unwrap().velocity;
+        assert!(x1 == 0.0 && y1 < 1.0);
+        assert!(x2 == 0.0 && y2 > 0.0);
+    }
+
+    #[test]
+    fn boids_wrapping_are_aligned() {
+        let b1 = Boid {
+            position: Vec2(5.0, 9.0),
+            velocity: Vec2(-2.0, 3.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b2 = Boid {
+            position: Vec2(5.0, 1.0),
+            velocity: Vec2(1.0, 0.5),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(0)
+            .alignment_weighting(1)
+            .separation_weighting(0)
+            .alignment_radius(2.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b1, b2].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let Vec2(x1, y1) = boids.first().unwrap().velocity;
+        let Vec2(x2, y2) = boids.last().unwrap().velocity;
+        println!("({},{}) ({},{})", x1, y1, x2, y2);
+        assert!(x1 > -2.0);
+        assert!(y1 < 3.0);
+        assert!(x2 < 1.0);
+        assert!(y2 > 0.5);
+    }
+
+    #[test]
+    fn boids_next_to_each_other_separate() {
+        let b1 = Boid {
+            position: Vec2(1.0, 1.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b2 = Boid {
+            position: Vec2(2.0, 1.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe::Builder::from_preset(universe::Preset::Basic)
+            .number_of_boids(2)
+            .grid_size(10.0)
+            .attraction_weighting(0)
+            .alignment_weighting(0)
+            .separation_weighting(1)
+            .separation_radius(1.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b1, b2].into(),
+            }))
+            .build();
+        universe.tick();
+        let boids = universe.get_boids();
+        let (x1, _) = boids.first().unwrap().xy();
+        let (x2, _) = boids.last().unwrap().xy();
+        assert!(x1 < 1.0);
+        assert!(x2 > 2.0);
     }
 }

@@ -11,6 +11,12 @@ impl From<(f32, f32)> for Vec2 {
     }
 }
 
+impl From<Vec2> for (f32, f32) {
+    fn from(value: Vec2) -> Self {
+        (value.0, value.1)
+    }
+}
+
 impl Add for Vec2 {
     type Output = Vec2;
     fn add(self, rhs: Self) -> Self::Output {
