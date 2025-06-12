@@ -134,7 +134,7 @@ impl Universe {
     }
 
     fn separation_acceleration(&self, boid: &Boid) -> Vec2 {
-        let neighbors = self.grid.neighbors(boid, self.attraction_radius);
+        let neighbors = self.grid.neighbors(boid, self.separation_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
         }
@@ -172,19 +172,20 @@ impl Universe {
             //   ###########   |   ###########   |   ###########
             //   #         #   |   #         #   |   #         #
             //   #         #   |   #         #   |   #         #
-            // b # a       #   |   #       a # b |   # a-b     #
-            //   #         #   |   #         #   |   #  1      #
+            // b # a       #   |   #       a # b |   # a b     #
+            //   #         #   |   #         #   |   #         #
             //   #         #   |   #         #   |   #         #
             //   ###########   |   ###########   |   ###########
             //
             // So that now the acceleration calculations are going in the right direction.
             // This logic applies to both x and y axis so we have the same function for both.
             if difference_between_coordinates > half_the_size_of_the_grid {
-                return b - grid_size;
+                b - grid_size
             } else if difference_between_coordinates < -half_the_size_of_the_grid {
-                return b + grid_size;
+                b + grid_size
+            } else {
+                b
             }
-            b
         };
 
         Vec2(adjusted_axis(x1, x2), adjusted_axis(y1, y2))
@@ -251,7 +252,7 @@ mod tests {
     fn boids_next_to_each_other_are_attracted() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(2)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .attraction_weighting(1)
                 .alignment_weighting(0)
@@ -285,7 +286,7 @@ mod tests {
     fn boids_wrapping_are_attracted() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(2)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .attraction_weighting(1)
                 .alignment_weighting(0)
@@ -330,7 +331,7 @@ mod tests {
     fn boids_next_to_each_other_are_aligned() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(2)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .attraction_weighting(0)
                 .alignment_weighting(1)
@@ -381,7 +382,7 @@ mod tests {
     fn boids_wrapping_are_aligned() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(2)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .attraction_weighting(0)
                 .alignment_weighting(1)
@@ -414,7 +415,7 @@ mod tests {
     fn boids_next_to_each_other_separate() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(2)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .attraction_weighting(0)
                 .alignment_weighting(0)
@@ -439,7 +440,7 @@ mod tests {
     fn boid_wraps_around_grid_when_moving() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(1)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .maximum_velocity(10.0)
                 .boid_factory(Box::new(TestBoidFactory {
@@ -482,7 +483,7 @@ mod tests {
     fn maximum_velocity_applies_correctly() {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
-                .number_of_boids(1)
+                .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .boid_factory(Box::new(TestBoidFactory {
                     boids: boids.into(),
@@ -552,6 +553,40 @@ mod tests {
         let Vec2(v1, v2) = universe.get_boids()[0].velocity;
         assert!(v1 > 0.9 && v1 < 1.1);
         assert!(v2 < -0.9 && v2 > -1.1);
+    }
+
+    #[test]
+    fn noise_affects_calculations() {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
+            universe::Builder::from_preset(universe::Preset::Basic)
+                .number_of_boids(boids.len() as u32)
+                .grid_size(10.0)
+                .maximum_velocity(10.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
+        };
+
+        let b1 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(1.0, 1.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_with_boids(vec![b1])
+            .noise_fraction(0.0)
+            .build();
+        universe.tick();
+        let Vec2(u1, u2) = universe.get_boids()[0].velocity;
+        assert_eq!(1.0, u1);
+        assert_eq!(1.0, u2);
+
+        let mut universe = test_specific_builder_with_boids(vec![b1])
+            .noise_fraction(1.0)
+            .build();
+        universe.tick();
+        let Vec2(u1, u2) = universe.get_boids()[0].velocity;
+        assert_ne!(1.0, u1);
+        assert_ne!(1.0, u2);
     }
 
     #[test]
