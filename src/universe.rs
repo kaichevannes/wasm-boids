@@ -53,20 +53,20 @@ impl Universe {
             // should be normalised, or bounded by a max velocity.
             let velocity = boid.velocity + acceleration;
             // make sure still in bounds of the grid.
-            let mut position = boid.position + velocity;
+            let position = boid.position + velocity;
 
-            let grid_size = self.grid.get_size();
-            if position.0 < 0.0 {
-                position.0 += grid_size;
-            } else if position.0 > grid_size {
-                position.0 -= grid_size;
-            }
-
-            if position.1 < 0.0 {
-                position.1 += grid_size;
-            } else if position.1 > grid_size {
-                position.1 -= grid_size;
-            }
+            // let grid_size = self.grid.get_size();
+            // if position.0 < 0.0 {
+            //     position.0 += grid_size;
+            // } else if position.0 > grid_size {
+            //     position.0 -= grid_size;
+            // }
+            //
+            // if position.1 < 0.0 {
+            //     position.1 += grid_size;
+            // } else if position.1 > grid_size {
+            //     position.1 -= grid_size;
+            // }
 
             boids.push(Boid {
                 position,
@@ -130,7 +130,7 @@ impl Universe {
             let grid_size = self.grid.get_size();
             if n2 - n1 > grid_size / 2.0 {
                 return n2 - grid_size;
-            } else if n2 - x1 < -grid_size / 2.0 {
+            } else if n2 - n1 < -grid_size / 2.0 {
                 return n2 + grid_size;
             }
             n2
@@ -257,6 +257,7 @@ mod tests {
         universe.tick();
         let Vec2(_, y1) = universe.get_boids()[0].position;
         let Vec2(_, y2) = universe.get_boids()[1].position;
+        println!("y1 {}, y2 {}", y1, y2);
         assert!(y1 > 9.0);
         assert!(y2 < 1.0);
 
