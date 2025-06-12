@@ -121,14 +121,41 @@ impl Universe {
         let (x1, y1) = starting.into();
         let (x2, y2) = other.into();
 
-        let adjusted_axis = |n1: f32, n2: f32| {
+        let adjusted_axis = |a: f32, b: f32| {
             let grid_size = self.grid.get_size();
-            if n2 - n1 > grid_size / 2.0 {
-                return n2 - grid_size;
-            } else if n2 - n1 < -grid_size / 2.0 {
-                return n2 + grid_size;
+            let difference_between_coordinates = b - a;
+            let half_the_size_of_the_grid = grid_size / 2.0;
+
+            // Imagine a grid with a size of 10 that has the following boids. The left arrangement
+            // is the first block of the if statement, the middle arrangement is the else if block,
+            // and the right arrangement is the last case where we just return the same position.
+            //
+            //   ###########   |   ###########   |   ###########
+            //   #         #   |   #         #   |   #         #
+            //   #         #   |   #         #   |   #         #
+            //   # a-----b #   |   # b-----a #   |   # a-b     #
+            //   #    8    #   |   #    8    #   |   #  1      #
+            //   #         #   |   #         #   |   #         #
+            //   ###########   |   ###########   |   ###########
+            //
+            // We want to get this:
+            //
+            //   ###########   |   ###########   |   ###########
+            //   #         #   |   #         #   |   #         #
+            //   #         #   |   #         #   |   #         #
+            // b # a       #   |   #       a # b |   # a-b     #
+            //   #         #   |   #         #   |   #  1      #
+            //   #         #   |   #         #   |   #         #
+            //   ###########   |   ###########   |   ###########
+            //
+            // So that now the acceleration calculations are going in the right direction.
+            // This logic applies to both x and y axis so we have the same function for both.
+            if difference_between_coordinates > half_the_size_of_the_grid {
+                return b - grid_size;
+            } else if difference_between_coordinates < -half_the_size_of_the_grid {
+                return b + grid_size;
             }
-            n2
+            b
         };
 
         Vec2(adjusted_axis(x1, x2), adjusted_axis(y1, y2))
