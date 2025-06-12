@@ -1,4 +1,4 @@
-use std::ops::{Add, Div, Mul, Sub};
+use std::ops::{Add, Div, Mul, Rem, Sub};
 
 use crate::grid::Point;
 
@@ -21,6 +21,13 @@ impl Point for Boid {
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub struct Vec2(pub f32, pub f32);
 
+impl Rem<f32> for Vec2 {
+    type Output = Vec2;
+    fn rem(self, rhs: f32) -> Self::Output {
+        Vec2(self.0 % rhs, self.1 % rhs)
+    }
+}
+
 impl From<(f32, f32)> for Vec2 {
     fn from(value: (f32, f32)) -> Self {
         Vec2(value.0, value.1)
@@ -37,6 +44,13 @@ impl Add for Vec2 {
     type Output = Vec2;
     fn add(self, rhs: Self) -> Self::Output {
         Vec2(self.0 + rhs.0, self.1 + rhs.1)
+    }
+}
+
+impl Add<f32> for Vec2 {
+    type Output = Vec2;
+    fn add(self, rhs: f32) -> Self::Output {
+        Vec2(self.0 + rhs, self.1 + rhs)
     }
 }
 

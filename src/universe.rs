@@ -52,21 +52,16 @@ impl Universe {
                 + self.separation_acceleration(boid) * self.separation_weighting;
             // should be normalised, or bounded by a max velocity.
             let velocity = boid.velocity + acceleration;
-            // make sure still in bounds of the grid.
-            let mut position = boid.position + velocity;
-
             let grid_size = self.grid.get_size();
-            if position.0 < 0.0 {
-                position.0 += grid_size;
-            } else if position.0 > grid_size {
-                position.0 -= grid_size;
-            }
 
-            if position.1 < 0.0 {
-                position.1 += grid_size;
-            } else if position.1 > grid_size {
-                position.1 -= grid_size;
-            }
+            let raw_position = boid.position + velocity;
+            // The first % grid_size ensures we are in the bounds of [-grid_size, grid_size].
+            // Then we add the grid_size to ensure we have a positive value (e.g. we can have a
+            // value of -3.0 here which given a grid_size of 10.0 will become 7.0) and % again to
+            // ensure values above grid_size are put back into the grid (i.e. if before we had
+            // positive 3.0, adding 10 gives us 13.0. We need this to be within [0, grid_size]
+            // so we modulo the grid size to get 3.0).
+            let position = (raw_position % grid_size + grid_size) % grid_size;
 
             boids.push(Boid {
                 position,
