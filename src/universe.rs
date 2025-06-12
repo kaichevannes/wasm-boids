@@ -53,20 +53,20 @@ impl Universe {
             // should be normalised, or bounded by a max velocity.
             let velocity = boid.velocity + acceleration;
             // make sure still in bounds of the grid.
-            let position = boid.position + velocity;
+            let mut position = boid.position + velocity;
 
-            // let grid_size = self.grid.get_size();
-            // if position.0 < 0.0 {
-            //     position.0 += grid_size;
-            // } else if position.0 > grid_size {
-            //     position.0 -= grid_size;
-            // }
-            //
-            // if position.1 < 0.0 {
-            //     position.1 += grid_size;
-            // } else if position.1 > grid_size {
-            //     position.1 -= grid_size;
-            // }
+            let grid_size = self.grid.get_size();
+            if position.0 < 0.0 {
+                position.0 += grid_size;
+            } else if position.0 > grid_size {
+                position.0 -= grid_size;
+            }
+
+            if position.1 < 0.0 {
+                position.1 += grid_size;
+            } else if position.1 > grid_size {
+                position.1 -= grid_size;
+            }
 
             boids.push(Boid {
                 position,
@@ -423,7 +423,34 @@ mod tests {
             .build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
-        assert!(x1 > 9.0);
-        assert!(y1 == 5.0);
+        assert!(x1 == 9.0 && y1 == 5.0);
+
+        let b2 = Boid {
+            position: Vec2(5.0, 1.0),
+            velocity: Vec2(-1.0, -1.5),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe_builder_closure()
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b2].into(),
+            }))
+            .build();
+        universe.tick();
+        let Vec2(x1, y1) = universe.get_boids()[0].position;
+        assert!(x1 == 4.0 && y1 == 9.5);
+
+        let b3 = Boid {
+            position: Vec2(1.0, 9.0),
+            velocity: Vec2(-2.0, 2.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = universe_builder_closure()
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: vec![b3].into(),
+            }))
+            .build();
+        universe.tick();
+        let Vec2(x1, y1) = universe.get_boids()[0].position;
+        assert!(x1 == 9.0 && y1 == 1.0);
     }
 }
