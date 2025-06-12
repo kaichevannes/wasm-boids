@@ -26,6 +26,7 @@ pub struct Builder {
     attraction_radius: Option<f32>,
     alignment_radius: Option<f32>,
     separation_radius: Option<f32>,
+    maximum_velocity: Option<f32>,
     boid_factory: Box<dyn BoidFactory>,
 }
 
@@ -42,7 +43,8 @@ impl Builder {
                 .separation_weighting(1)
                 .attraction_radius(1.0)
                 .alignment_radius(1.0)
-                .separation_radius(1.0),
+                .separation_radius(1.0)
+                .maximum_velocity(1.0),
             Preset::Maruyama => Builder::default()
                 .number_of_boids(100)
                 .density(600.0)
@@ -52,17 +54,19 @@ impl Builder {
                 .separation_weighting(1)
                 .attraction_radius(0.05)
                 .alignment_radius(0.05)
-                .separation_radius(0.01),
+                .separation_radius(0.01)
+                .maximum_velocity(0.05),
             Preset::Zhang => Builder::default()
                 .number_of_boids(100)
-                .density(100.0)
+                .grid_size(100.0)
                 .noise_fraction(0.05)
                 .attraction_weighting(10)
                 .alignment_weighting(1)
                 .separation_weighting(400)
-                .attraction_radius(0.05)
-                .alignment_radius(0.05)
-                .separation_radius(0.05),
+                .attraction_radius(1.0)
+                .alignment_radius(1.0)
+                .separation_radius(1.0)
+                .maximum_velocity(1.0),
         }
     }
 
@@ -121,6 +125,11 @@ impl Builder {
         self
     }
 
+    pub fn maximum_velocity(mut self, magnitude: f32) -> Self {
+        self.maximum_velocity = Some(magnitude);
+        self
+    }
+
     pub fn build(mut self) -> Universe {
         let number_of_boids = self
             .number_of_boids
@@ -165,6 +174,9 @@ impl Builder {
             separation_radius: self
                 .separation_radius
                 .expect("Must provide separation_radius"),
+            maximum_velocity: self
+                .maximum_velocity
+                .expect("Must provide a maximum_velocity"),
             boid_factory: self.boid_factory,
             grid: Box::new(grid),
         }
@@ -192,6 +204,7 @@ impl Default for Builder {
             attraction_radius: None,
             alignment_radius: None,
             separation_radius: None,
+            maximum_velocity: None,
         }
     }
 }

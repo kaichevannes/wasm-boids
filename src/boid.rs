@@ -21,10 +21,9 @@ impl Point for Boid {
 #[derive(Clone, Debug, Copy, PartialEq)]
 pub struct Vec2(pub f32, pub f32);
 
-impl Rem<f32> for Vec2 {
-    type Output = Vec2;
-    fn rem(self, rhs: f32) -> Self::Output {
-        Vec2(self.0 % rhs, self.1 % rhs)
+impl Vec2 {
+    pub fn magnitude(&self) -> f32 {
+        (self.0.powi(2) + self.1.powi(2)).sqrt()
     }
 }
 
@@ -86,5 +85,12 @@ impl Div<usize> for Vec2 {
     type Output = Vec2;
     fn div(self, rhs: usize) -> Self::Output {
         self / rhs as f32
+    }
+}
+
+impl Rem<f32> for Vec2 {
+    type Output = Vec2;
+    fn rem(self, rhs: f32) -> Self::Output {
+        Vec2(self.0 % rhs, self.1 % rhs)
     }
 }

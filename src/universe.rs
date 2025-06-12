@@ -18,6 +18,7 @@ pub struct Universe {
     attraction_radius: f32,
     alignment_radius: f32,
     separation_radius: f32,
+    maximum_velocity: f32,
     grid: Box<dyn Grid<Boid>>,
     boid_factory: Box<dyn BoidFactory>,
 }
@@ -50,18 +51,31 @@ impl Universe {
                 + self.attraction_acceleration(boid) * self.attraction_weighting
                 + self.alignment_acceleration(boid) * self.alignment_weighting
                 + self.separation_acceleration(boid) * self.separation_weighting;
-            // should be normalised, or bounded by a max velocity.
-            let velocity = boid.velocity + acceleration;
-            let grid_size = self.grid.get_size();
 
-            let raw_position = boid.position + velocity;
-            // The first % grid_size ensures we are in the bounds of [-grid_size, grid_size].
-            // Then we add the grid_size to ensure we have a positive value (e.g. we can have a
-            // value of -3.0 here which given a grid_size of 10.0 will become 7.0) and % again to
-            // ensure values above grid_size are put back into the grid (i.e. if before we had
-            // positive 3.0, adding 10 gives us 13.0. We need this to be within [0, grid_size]
-            // so we modulo the grid size to get 3.0).
-            let position = (raw_position % grid_size + grid_size) % grid_size;
+            let velocity = {
+                let raw_velocity = boid.velocity + acceleration;
+                let speed = raw_velocity.magnitude();
+
+                if speed < self.maximum_velocity {
+                    raw_velocity
+                } else if speed > 0.0 {
+                    raw_velocity / speed * self.maximum_velocity
+                } else {
+                    Vec2(0.0, 0.0)
+                }
+            };
+
+            let position = {
+                // The first % grid_size ensures we are in the bounds of [-grid_size, grid_size].
+                // Then we add the grid_size to ensure we have a positive value (e.g. we can have a
+                // value of -3.0 here which given a grid_size of 10.0 will become 7.0) and % again to
+                // ensure values above grid_size are put back into the grid (i.e. if before we had
+                // positive 3.0, adding 10 gives us 13.0. We need this to be within [0, grid_size]
+                // so we modulo the grid size to get 3.0).
+                let grid_size = self.grid.get_size();
+                let raw_position = boid.position + velocity;
+                (raw_position % grid_size + grid_size) % grid_size
+            };
 
             boids.push(Boid {
                 position,
@@ -183,7 +197,7 @@ mod tests {
     }
 
     impl BoidFactory for TestBoidFactory {
-        fn create_n(&mut self, grid: &dyn grid::Grid<Boid>, number_of_boids: u32) -> Vec<Boid> {
+        fn create_n(&mut self, _: &dyn grid::Grid<Boid>, number_of_boids: u32) -> Vec<Boid> {
             let mut result = Vec::new();
             (0..number_of_boids).for_each(|_| {
                 result.push(
@@ -267,6 +281,7 @@ mod tests {
                 .alignment_weighting(0)
                 .separation_weighting(0)
                 .attraction_radius(2.0)
+                .maximum_velocity(10.0)
         };
 
         let b1 = create_boid_with_position(Vec2(5.0, 9.0));
@@ -279,9 +294,7 @@ mod tests {
         universe.tick();
         let Vec2(_, y1) = universe.get_boids()[0].position;
         let Vec2(_, y2) = universe.get_boids()[1].position;
-        println!("y1 {}, y2 {}", y1, y2);
-        assert!(y1 > 9.0);
-        assert!(y2 < 1.0);
+        assert!(y1 < 5.0 && y2 > 5.0);
 
         let b3 = create_boid_with_position(Vec2(1.0, 5.0));
         let b4 = create_boid_with_position(Vec2(9.0, 5.0));
@@ -293,8 +306,8 @@ mod tests {
         universe.tick();
         let Vec2(x1, _) = universe.get_boids()[0].position;
         let Vec2(x2, _) = universe.get_boids()[1].position;
-        assert!(x1 < 1.0);
-        assert!(x2 > 9.0);
+        assert!(x1 > 5.0);
+        assert!(x2 < 5.0);
 
         let b5 = create_boid_with_position(Vec2(1.0, 9.0));
         let b6 = create_boid_with_position(Vec2(9.0, 1.0));
@@ -307,8 +320,8 @@ mod tests {
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
         let Vec2(x2, y2) = universe.get_boids()[1].position;
-        assert!(x1 < 1.0 && y1 > 9.0);
-        assert!(x2 > 9.0 && y2 < 1.0);
+        assert!(x1 > 5.0 && y1 < 5.0);
+        assert!(x2 < 5.0 && y2 > 5.0);
     }
 
     #[test]
@@ -321,6 +334,7 @@ mod tests {
                 .alignment_weighting(1)
                 .separation_weighting(0)
                 .alignment_radius(1.0)
+                .maximum_velocity(10.0)
         };
 
         let b1 = Boid {
@@ -339,10 +353,10 @@ mod tests {
             }))
             .build();
         universe.tick();
-        let Vec2(x1, y1) = universe.get_boids()[0].velocity;
-        let Vec2(x2, y2) = universe.get_boids()[1].velocity;
-        assert!(x1 > 0.0 && y1 == 0.0);
-        assert!(x2 < 1.0 && y2 == 0.0);
+        let Vec2(u1, u2) = universe.get_boids()[0].velocity;
+        let Vec2(v1, v2) = universe.get_boids()[1].velocity;
+        assert!(u1 > 0.0 && u2 == 0.0);
+        assert!(v1 < 1.0 && v2 == 0.0);
 
         let b3 = Boid {
             position: Vec2(1.0, 1.0),
@@ -432,6 +446,7 @@ mod tests {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(1)
                 .grid_size(10.0)
+                .maximum_velocity(10.0)
         };
         let b1 = Boid {
             position: Vec2(0.0, 5.0),
@@ -459,6 +474,7 @@ mod tests {
             .build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
+        println!("{}, {}", x1, y1);
         assert!(x1 == 4.0 && y1 == 9.5);
 
         let b3 = Boid {
@@ -474,5 +490,81 @@ mod tests {
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
         assert!(x1 == 9.0 && y1 == 1.0);
+    }
+
+    #[test]
+    fn maximum_velocity_applies_correctly() {
+        let test_specific_builder_from_boids = |boids: Vec<Boid>| {
+            universe::Builder::from_preset(universe::Preset::Basic)
+                .number_of_boids(1)
+                .grid_size(10.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
+        };
+
+        let original_position = Vec2(5.0, 5.0);
+        let b1 = Boid {
+            position: original_position,
+            velocity: Vec2(-1.0, 2.3),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_from_boids(vec![b1])
+            .maximum_velocity(0.0)
+            .build();
+        universe.tick();
+        let updated_position = universe.get_boids()[0].position;
+        assert_eq!(original_position, updated_position);
+
+        let b2 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(2.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_from_boids(vec![b2])
+            .maximum_velocity(1.0)
+            .build();
+        universe.tick();
+        let Vec2(v1, v2) = universe.get_boids()[0].velocity;
+        assert!(v1 == 1.0 && v2 == 0.0);
+
+        let b3 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(0.0, 5.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_from_boids(vec![b3])
+            .maximum_velocity(3.5)
+            .build();
+        universe.tick();
+        let Vec2(v1, v2) = universe.get_boids()[0].velocity;
+        assert!(v1 == 0.0 && v2 == 3.5);
+
+        let b4 = Boid {
+            position: Vec2(9.0, 9.0),
+            velocity: Vec2(-6.0, -8.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_from_boids(vec![b4])
+            .maximum_velocity(5.0)
+            .build();
+        universe.tick();
+        let Vec2(x1, y1) = universe.get_boids()[0].position;
+        let Vec2(v1, v2) = universe.get_boids()[0].velocity;
+        assert!(x1 == 6.0 && y1 == 5.0);
+        assert!(v1 == -3.0 && v2 == -4.0);
+
+        let b5 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(1.0, -1.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_from_boids(vec![b5])
+            .maximum_velocity(10.0)
+            .build();
+        universe.tick();
+        let Vec2(v1, v2) = universe.get_boids()[0].velocity;
+        assert!(v1 > 0.9 && v1 < 1.1);
+        assert!(v2 < -0.9 && v2 > -1.1);
     }
 }
