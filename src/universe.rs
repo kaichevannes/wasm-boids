@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn boids_next_to_each_other_are_attracted() {
-        let universe_builder_closure = || {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(2)
                 .grid_size(10.0)
@@ -242,15 +242,14 @@ mod tests {
                 .alignment_weighting(0)
                 .separation_weighting(0)
                 .attraction_radius(1.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
         };
 
         let b1 = create_boid_with_position(Vec2(1.0, 1.0));
         let b2 = create_boid_with_position(Vec2(2.0, 1.0));
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b1, b2].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b1, b2]).build();
         universe.tick();
         let Vec2(x1, _) = universe.get_boids()[0].position;
         let Vec2(x2, _) = universe.get_boids()[1].position;
@@ -259,11 +258,7 @@ mod tests {
 
         let b3 = create_boid_with_position(Vec2(6.0, 5.0));
         let b4 = create_boid_with_position(Vec2(6.0, 4.0));
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b3, b4].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b3, b4]).build();
         universe.tick();
         let Vec2(_, y1) = universe.get_boids()[0].position;
         let Vec2(_, y2) = universe.get_boids()[1].position;
@@ -273,7 +268,7 @@ mod tests {
 
     #[test]
     fn boids_wrapping_are_attracted() {
-        let universe_builder_closure = || {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(2)
                 .grid_size(10.0)
@@ -282,15 +277,14 @@ mod tests {
                 .separation_weighting(0)
                 .attraction_radius(2.0)
                 .maximum_velocity(10.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
         };
 
         let b1 = create_boid_with_position(Vec2(5.0, 9.0));
         let b2 = create_boid_with_position(Vec2(5.0, 1.0));
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b1, b2].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b1, b2]).build();
         universe.tick();
         let Vec2(_, y1) = universe.get_boids()[0].position;
         let Vec2(_, y2) = universe.get_boids()[1].position;
@@ -298,11 +292,7 @@ mod tests {
 
         let b3 = create_boid_with_position(Vec2(1.0, 5.0));
         let b4 = create_boid_with_position(Vec2(9.0, 5.0));
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b3, b4].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b3, b4]).build();
         universe.tick();
         let Vec2(x1, _) = universe.get_boids()[0].position;
         let Vec2(x2, _) = universe.get_boids()[1].position;
@@ -311,11 +301,8 @@ mod tests {
 
         let b5 = create_boid_with_position(Vec2(1.0, 9.0));
         let b6 = create_boid_with_position(Vec2(9.0, 1.0));
-        let mut universe = universe_builder_closure()
+        let mut universe = test_specific_builder_with_boids(vec![b5, b6])
             .attraction_radius(3.0)
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b5, b6].into(),
-            }))
             .build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
@@ -326,7 +313,7 @@ mod tests {
 
     #[test]
     fn boids_next_to_each_other_are_aligned() {
-        let universe_builder_closure = || {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(2)
                 .grid_size(10.0)
@@ -335,6 +322,9 @@ mod tests {
                 .separation_weighting(0)
                 .alignment_radius(1.0)
                 .maximum_velocity(10.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
         };
 
         let b1 = Boid {
@@ -347,11 +337,7 @@ mod tests {
             velocity: Vec2(1.0, 0.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b1, b2].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b1, b2]).build();
         universe.tick();
         let Vec2(u1, u2) = universe.get_boids()[0].velocity;
         let Vec2(v1, v2) = universe.get_boids()[1].velocity;
@@ -368,11 +354,7 @@ mod tests {
             velocity: Vec2(0.0, 0.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b3, b4].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b3, b4]).build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].velocity;
         let Vec2(x2, y2) = universe.get_boids()[1].velocity;
@@ -382,7 +364,7 @@ mod tests {
 
     #[test]
     fn boids_wrapping_are_aligned() {
-        let universe_builder_closure = || {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(2)
                 .grid_size(10.0)
@@ -390,6 +372,9 @@ mod tests {
                 .alignment_weighting(1)
                 .separation_weighting(0)
                 .alignment_radius(2.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
         };
 
         let b1 = Boid {
@@ -402,11 +387,7 @@ mod tests {
             velocity: Vec2(1.0, 0.5),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b1, b2].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b1, b2]).build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].velocity;
         let Vec2(x2, y2) = universe.get_boids()[1].velocity;
@@ -416,7 +397,7 @@ mod tests {
 
     #[test]
     fn boids_next_to_each_other_separate() {
-        let universe_builder_closure = || {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(2)
                 .grid_size(10.0)
@@ -424,15 +405,14 @@ mod tests {
                 .alignment_weighting(0)
                 .separation_weighting(1)
                 .separation_radius(1.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
         };
 
         let b1 = create_boid_with_position(Vec2(1.0, 1.0));
         let b2 = create_boid_with_position(Vec2(2.0, 1.0));
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b1, b2].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b1, b2]).build();
         universe.tick();
         let Vec2(x1, _) = universe.get_boids()[0].position;
         let Vec2(x2, _) = universe.get_boids()[1].position;
@@ -442,22 +422,21 @@ mod tests {
 
     #[test]
     fn boid_wraps_around_grid_when_moving() {
-        let universe_builder_closure = || {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(1)
                 .grid_size(10.0)
                 .maximum_velocity(10.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
         };
         let b1 = Boid {
             position: Vec2(0.0, 5.0),
             velocity: Vec2(-1.0, 0.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b1].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b1]).build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
         assert!(x1 == 9.0 && y1 == 5.0);
@@ -467,11 +446,7 @@ mod tests {
             velocity: Vec2(-1.0, -1.5),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b2].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b2]).build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
         println!("{}, {}", x1, y1);
@@ -482,11 +457,7 @@ mod tests {
             velocity: Vec2(-2.0, 2.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = universe_builder_closure()
-            .boid_factory(Box::new(TestBoidFactory {
-                boids: vec![b3].into(),
-            }))
-            .build();
+        let mut universe = test_specific_builder_with_boids(vec![b3]).build();
         universe.tick();
         let Vec2(x1, y1) = universe.get_boids()[0].position;
         assert!(x1 == 9.0 && y1 == 1.0);
@@ -494,7 +465,7 @@ mod tests {
 
     #[test]
     fn maximum_velocity_applies_correctly() {
-        let test_specific_builder_from_boids = |boids: Vec<Boid>| {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(1)
                 .grid_size(10.0)
@@ -509,7 +480,7 @@ mod tests {
             velocity: Vec2(-1.0, 2.3),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = test_specific_builder_from_boids(vec![b1])
+        let mut universe = test_specific_builder_with_boids(vec![b1])
             .maximum_velocity(0.0)
             .build();
         universe.tick();
@@ -521,7 +492,7 @@ mod tests {
             velocity: Vec2(2.0, 0.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = test_specific_builder_from_boids(vec![b2])
+        let mut universe = test_specific_builder_with_boids(vec![b2])
             .maximum_velocity(1.0)
             .build();
         universe.tick();
@@ -533,7 +504,7 @@ mod tests {
             velocity: Vec2(0.0, 5.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = test_specific_builder_from_boids(vec![b3])
+        let mut universe = test_specific_builder_with_boids(vec![b3])
             .maximum_velocity(3.5)
             .build();
         universe.tick();
@@ -545,7 +516,7 @@ mod tests {
             velocity: Vec2(-6.0, -8.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = test_specific_builder_from_boids(vec![b4])
+        let mut universe = test_specific_builder_with_boids(vec![b4])
             .maximum_velocity(5.0)
             .build();
         universe.tick();
@@ -559,7 +530,7 @@ mod tests {
             velocity: Vec2(1.0, -1.0),
             acceleration: Vec2(0.0, 0.0),
         };
-        let mut universe = test_specific_builder_from_boids(vec![b5])
+        let mut universe = test_specific_builder_with_boids(vec![b5])
             .maximum_velocity(10.0)
             .build();
         universe.tick();
