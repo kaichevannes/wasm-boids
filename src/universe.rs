@@ -85,6 +85,21 @@ impl Universe {
         }
         self.grid.set_points(boids);
     }
+
+    pub fn set_number_of_boids(&mut self, n: u32) {
+        let mut current_boids: Vec<Boid> = self.get_boids().to_vec();
+        let current_n = current_boids.len() as u32;
+
+        if n > current_n {
+            let new_boids = self
+                .boid_factory
+                .create_n(self.grid.as_ref(), n - current_n);
+            current_boids.extend(new_boids);
+        } else {
+            current_boids.truncate(n as usize);
+        }
+        self.grid.set_points(current_boids);
+    }
 }
 
 impl Universe {
@@ -537,5 +552,23 @@ mod tests {
         let Vec2(v1, v2) = universe.get_boids()[0].velocity;
         assert!(v1 > 0.9 && v1 < 1.1);
         assert!(v2 < -0.9 && v2 > -1.1);
+    }
+
+    #[test]
+    fn can_change_the_number_of_boids_during_the_simulation() {
+        let mut universe = Universe::build_from_preset(universe::Preset::Basic);
+        universe.tick();
+        universe.set_number_of_boids(50);
+        assert_eq!(50, universe.get_boids().len());
+        universe.set_number_of_boids(10);
+        assert_eq!(10, universe.get_boids().len());
+        universe.set_number_of_boids(1000);
+        assert_eq!(1000, universe.get_boids().len());
+        universe.set_number_of_boids(100);
+        assert_eq!(100, universe.get_boids().len());
+        universe.set_number_of_boids(0);
+        assert_eq!(0, universe.get_boids().len());
+        universe.set_number_of_boids(100);
+        assert_eq!(100, universe.get_boids().len());
     }
 }
