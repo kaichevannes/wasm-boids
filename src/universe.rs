@@ -6,11 +6,11 @@ use crate::{
     grid::Grid,
 };
 use builder::{Builder, Preset};
+use rand::{Rng, rngs::ThreadRng};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
 pub struct Universe {
-    density: f32,
     noise_fraction: f32,
     attraction_weighting: f32,
     alignment_weighting: f32,
@@ -21,6 +21,7 @@ pub struct Universe {
     maximum_velocity: f32,
     grid: Box<dyn Grid<Boid>>,
     boid_factory: Box<dyn BoidFactory>,
+    noise_rng: ThreadRng,
 }
 
 #[wasm_bindgen]
@@ -47,10 +48,18 @@ impl Universe {
     pub fn tick(&mut self) {
         let mut boids = Vec::new();
         for boid in self.grid.get_points().iter() {
+            let noise_deduction = self.noise_fraction / 3.0;
+            let noise_accelereation = Vec2(
+                self.noise_rng.random_range(-1.0..1.0),
+                self.noise_rng.random_range(-1.0..1.0),
+            );
             let acceleration = boid.acceleration
-                + self.attraction_acceleration(boid) * self.attraction_weighting
-                + self.alignment_acceleration(boid) * self.alignment_weighting
-                + self.separation_acceleration(boid) * self.separation_weighting;
+                + self.attraction_acceleration(boid)
+                    * (self.attraction_weighting - noise_deduction)
+                + self.alignment_acceleration(boid) * (self.alignment_weighting - noise_deduction)
+                + self.separation_acceleration(boid)
+                    * (self.separation_weighting - noise_deduction)
+                + noise_accelereation * self.noise_fraction;
 
             let velocity = {
                 let raw_velocity = boid.velocity + acceleration;
@@ -100,11 +109,49 @@ impl Universe {
         }
         self.grid.set_points(current_boids);
     }
-}
 
-impl Universe {
-    pub fn get_boids(&self) -> &[Boid] {
-        self.grid.get_points()
+    pub fn set_noise_fraction(&mut self, fraction: f32) {
+        self.noise_fraction = fraction.clamp(0.0, 1.0);
+    }
+
+    pub fn set_density(&mut self, density: f32) {
+        let number_of_boids = self.grid.get_points().len();
+        self.grid.resize((number_of_boids as f32 / density).sqrt());
+    }
+
+    pub fn set_attraction_weighting(&mut self, weighting: f32) {
+        self.attraction_weighting = weighting.clamp(0.0, 1.0);
+        self.reweight();
+    }
+
+    pub fn set_alignment_weighting(&mut self, weighting: f32) {
+        self.alignment_weighting = weighting.clamp(0.0, 1.0);
+        self.reweight();
+    }
+
+    pub fn set_separation_weighting(&mut self, weighting: f32) {
+        self.separation_weighting = weighting.clamp(0.0, 1.0);
+        self.reweight();
+    }
+
+    pub fn set_attraction_radius(&mut self, radius: f32) {
+        self.attraction_radius = radius.max(0.0);
+    }
+
+    pub fn set_alignment_radius(&mut self, radius: f32) {
+        self.alignment_radius = radius.max(0.0);
+    }
+
+    pub fn set_seperation_radius(&mut self, radius: f32) {
+        self.separation_radius = radius.max(0.0);
+    }
+
+    fn reweight(&mut self) {
+        let total_weighting =
+            self.attraction_weighting + self.alignment_weighting + self.separation_weighting;
+        self.attraction_weighting /= total_weighting;
+        self.alignment_weighting /= total_weighting;
+        self.separation_weighting /= total_weighting;
     }
 
     fn attraction_acceleration(&self, boid: &Boid) -> Vec2 {
@@ -189,6 +236,12 @@ impl Universe {
         };
 
         Vec2(adjusted_axis(x1, x2), adjusted_axis(y1, y2))
+    }
+}
+
+impl Universe {
+    pub fn get_boids(&self) -> &[Boid] {
+        self.grid.get_points()
     }
 }
 
@@ -332,6 +385,7 @@ mod tests {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(boids.len() as u32)
+                .noise_fraction(0.0)
                 .grid_size(10.0)
                 .attraction_weighting(0)
                 .alignment_weighting(1)
@@ -443,6 +497,7 @@ mod tests {
                 .number_of_boids(boids.len() as u32)
                 .grid_size(10.0)
                 .maximum_velocity(10.0)
+                .noise_fraction(0.0)
                 .boid_factory(Box::new(TestBoidFactory {
                     boids: boids.into(),
                 }))
@@ -484,6 +539,7 @@ mod tests {
         let test_specific_builder_with_boids = |boids: Vec<Boid>| {
             universe::Builder::from_preset(universe::Preset::Basic)
                 .number_of_boids(boids.len() as u32)
+                .noise_fraction(0.0)
                 .grid_size(10.0)
                 .boid_factory(Box::new(TestBoidFactory {
                     boids: boids.into(),
@@ -605,5 +661,118 @@ mod tests {
         assert_eq!(0, universe.get_boids().len());
         universe.set_number_of_boids(100);
         assert_eq!(100, universe.get_boids().len());
+    }
+
+    #[test]
+    fn can_change_the_density_during_the_simulation() {
+        let boids: Vec<Boid> = (1..=10)
+            .map(|n| create_boid_with_position(Vec2(n as f32, n as f32)))
+            .collect();
+        let mut universe = universe::Builder::from_preset(universe::builder::Preset::Basic)
+            .number_of_boids(10)
+            .grid_size(10.0)
+            .boid_factory(Box::new(TestBoidFactory {
+                boids: boids.into(),
+            }))
+            .build();
+
+        assert_eq!(Vec2(10.0, 10.0), universe.get_boids()[9].position);
+        universe.set_density(10.0);
+        assert_eq!(Vec2(1.0, 1.0), universe.get_boids()[9].position);
+        universe.set_density(0.00001);
+        assert_eq!(Vec2(1000.0, 1000.0), universe.get_boids()[9].position);
+        universe.set_density(0.625);
+        assert_eq!(Vec2(4.0, 4.0), universe.get_boids()[9].position);
+    }
+
+    #[test]
+    fn can_change_weightings_and_radii_during_simulation() {
+        let test_specific_builder_with_boids = |boids: Vec<Boid>| {
+            universe::Builder::from_preset(universe::Preset::Basic)
+                .number_of_boids(boids.len() as u32)
+                .maximum_velocity(10.0)
+                .grid_size(10.0)
+                .noise_fraction(0.0)
+                .attraction_weighting(0)
+                .alignment_weighting(0)
+                .separation_weighting(0)
+                .attraction_radius(0.0)
+                .alignment_radius(0.0)
+                .separation_radius(0.0)
+                .boid_factory(Box::new(TestBoidFactory {
+                    boids: boids.into(),
+                }))
+        };
+
+        let b1 = Boid {
+            position: Vec2(4.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b2 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_with_boids(vec![b1, b2]).build();
+        universe.tick();
+        assert_eq!(Vec2(4.0, 5.0), universe.get_boids()[0].position);
+        assert_eq!(Vec2(5.0, 5.0), universe.get_boids()[1].position);
+        universe.set_attraction_weighting(1.0);
+        universe.tick();
+        assert_eq!(Vec2(4.0, 5.0), universe.get_boids()[0].position);
+        assert_eq!(Vec2(5.0, 5.0), universe.get_boids()[1].position);
+        universe.set_attraction_radius(1.0);
+        universe.tick();
+        assert_eq!(Vec2(5.0, 5.0), universe.get_boids()[0].position);
+        assert_eq!(Vec2(4.0, 5.0), universe.get_boids()[1].position);
+
+        let b3 = Boid {
+            position: Vec2(3.9, 5.0),
+            velocity: Vec2(1.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b4 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_with_boids(vec![b3, b4]).build();
+        universe.tick();
+        assert_eq!(Vec2(1.0, 0.0), universe.get_boids()[0].velocity);
+        assert_eq!(Vec2(0.0, 0.0), universe.get_boids()[1].velocity);
+        universe.set_alignment_weighting(1.0);
+        universe.tick();
+        assert_eq!(Vec2(1.0, 0.0), universe.get_boids()[0].velocity);
+        assert_eq!(Vec2(0.0, 0.0), universe.get_boids()[1].velocity);
+        universe.set_alignment_radius(1.0);
+        universe.tick();
+        let Vec2(u1, u2) = universe.get_boids()[0].velocity;
+        let Vec2(v1, v2) = universe.get_boids()[1].velocity;
+        assert!(u1 < 1.0 && u2 == 0.0);
+        assert!(v1 > 0.0 && v2 == 0.0);
+
+        let b5 = Boid {
+            position: Vec2(4.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let b6 = Boid {
+            position: Vec2(5.0, 5.0),
+            velocity: Vec2(0.0, 0.0),
+            acceleration: Vec2(0.0, 0.0),
+        };
+        let mut universe = test_specific_builder_with_boids(vec![b5, b6]).build();
+        universe.tick();
+        assert_eq!(Vec2(4.0, 5.0), universe.get_boids()[0].position);
+        assert_eq!(Vec2(5.0, 5.0), universe.get_boids()[1].position);
+        universe.set_separation_weighting(1.0);
+        universe.tick();
+        assert_eq!(Vec2(4.0, 5.0), universe.get_boids()[0].position);
+        assert_eq!(Vec2(5.0, 5.0), universe.get_boids()[1].position);
+        universe.set_seperation_radius(1.0);
+        universe.tick();
+        assert_eq!(Vec2(3.0, 5.0), universe.get_boids()[0].position);
+        assert_eq!(Vec2(6.0, 5.0), universe.get_boids()[1].position);
     }
 }

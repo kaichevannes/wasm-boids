@@ -144,7 +144,10 @@ impl Builder {
         let separation_weighting = self
             .separation_weighting
             .expect("Must provide separation_weighting");
-        let total_weighting = attraction_weighting + alignment_weighting + separation_weighting;
+        let mut total_weighting = attraction_weighting + alignment_weighting + separation_weighting;
+        if total_weighting == 0 {
+            total_weighting = 1;
+        }
 
         let density = self.density.unwrap_or_else(|| {
             if number_of_boids == 0 {
@@ -160,7 +163,7 @@ impl Builder {
         grid = NaiveGrid::new((number_of_boids as f32 / density).sqrt());
         grid.set_points(self.boid_factory.create_n(&grid, number_of_boids));
         Universe {
-            density,
+            noise_rng: rand::rng(),
             noise_fraction: self.noise_fraction.expect("Must provide noise_fraction"),
             attraction_weighting: attraction_weighting as f32 / total_weighting as f32,
             alignment_weighting: alignment_weighting as f32 / total_weighting as f32,
