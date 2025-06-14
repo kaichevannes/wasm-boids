@@ -47,17 +47,18 @@ impl Universe {
     /// This will perform a state update for every Boid in the universe.
     pub fn tick(&mut self) {
         let mut boids = Vec::new();
-        for boid in self.grid.get_points().iter() {
+        let boids_to_iterate_over: Vec<Boid> = self.grid.get_points().iter().cloned().collect();
+        for boid in boids_to_iterate_over {
             let noise_deduction = self.noise_fraction / 3.0;
             let noise_accelereation = Vec2(
                 self.noise_rng.random_range(-1.0..1.0),
                 self.noise_rng.random_range(-1.0..1.0),
             );
             let acceleration = boid.acceleration
-                + self.attraction_acceleration(boid)
+                + self.attraction_acceleration(&boid)
                     * (self.attraction_weighting - noise_deduction)
-                + self.alignment_acceleration(boid) * (self.alignment_weighting - noise_deduction)
-                + self.separation_acceleration(boid)
+                + self.alignment_acceleration(&boid) * (self.alignment_weighting - noise_deduction)
+                + self.separation_acceleration(&boid)
                     * (self.separation_weighting - noise_deduction)
                 + noise_accelereation * self.noise_fraction;
 
@@ -154,20 +155,21 @@ impl Universe {
         self.separation_weighting /= total_weighting;
     }
 
-    fn attraction_acceleration(&self, boid: &Boid) -> Vec2 {
+    fn attraction_acceleration(&mut self, boid: &Boid) -> Vec2 {
+        let grid_size = self.grid.get_size();
         let neighbors = self.grid.neighbors(boid, self.attraction_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
         }
 
         let total_position = neighbors.iter().fold(Vec2(0.0, 0.0), |acc, n| {
-            acc + self.wrapped_position(boid.position, n.position)
+            acc + Universe::wrapped_position(grid_size, boid.position, n.position)
         });
         let average_position = total_position / neighbors.len();
         average_position - boid.position
     }
 
-    fn alignment_acceleration(&self, boid: &Boid) -> Vec2 {
+    fn alignment_acceleration(&mut self, boid: &Boid) -> Vec2 {
         let neighbors = self.grid.neighbors(boid, self.alignment_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
@@ -180,25 +182,26 @@ impl Universe {
         average_velocity - boid.velocity
     }
 
-    fn separation_acceleration(&self, boid: &Boid) -> Vec2 {
+    fn separation_acceleration(&mut self, boid: &Boid) -> Vec2 {
+        let grid_size = self.grid.get_size();
         let neighbors = self.grid.neighbors(boid, self.separation_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
         }
 
         let total_position = neighbors.iter().fold(Vec2(0.0, 0.0), |acc, n| {
-            acc + self.wrapped_position(boid.position, n.position)
+            acc + Universe::wrapped_position(grid_size, boid.position, n.position)
         });
         let average_position = total_position / neighbors.len();
         boid.position - average_position
     }
 
-    fn wrapped_position(&self, starting: Vec2, other: Vec2) -> Vec2 {
+    fn wrapped_position(grid_size: f32, starting: Vec2, other: Vec2) -> Vec2 {
         let (x1, y1) = starting.into();
         let (x2, y2) = other.into();
 
         let adjusted_axis = |a: f32, b: f32| {
-            let grid_size = self.grid.get_size();
+            let grid_size = grid_size;
             let difference_between_coordinates = b - a;
             let half_the_size_of_the_grid = grid_size / 2.0;
 

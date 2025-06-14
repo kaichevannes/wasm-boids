@@ -30,7 +30,7 @@ impl BlueNoise {
 
     pub fn generate<T>(
         &mut self,
-        grid: &dyn Grid<T>,
+        grid: &mut dyn Grid<T>,
         number_of_samples_to_generate: u32,
     ) -> Vec<Sample>
     where
@@ -107,19 +107,19 @@ mod tests {
     #[test]
     fn generates_numbers() {
         let mut noise = BlueNoise::new();
-        let grid = NaiveGrid::<Sample>::new(100.0);
-        assert_eq!(1, noise.generate(&grid, 1).len());
-        assert_eq!(2, noise.generate(&grid, 2).len());
-        assert_eq!(10, noise.generate(&grid, 10).len());
-        assert_eq!(100, noise.generate(&grid, 100).len());
-        assert_eq!(1000, noise.generate(&grid, 1000).len());
+        let mut grid = NaiveGrid::<Sample>::new(100.0);
+        assert_eq!(1, noise.generate(&mut grid, 1).len());
+        assert_eq!(2, noise.generate(&mut grid, 2).len());
+        assert_eq!(10, noise.generate(&mut grid, 10).len());
+        assert_eq!(100, noise.generate(&mut grid, 100).len());
+        assert_eq!(1000, noise.generate(&mut grid, 1000).len());
     }
 
     #[test]
     fn generated_numbers_are_different() {
         let mut noise = BlueNoise::new();
-        let grid = NaiveGrid::<Sample>::new(100.0);
-        let numbers = noise.generate(&grid, 100);
+        let mut grid = NaiveGrid::<Sample>::new(100.0);
+        let numbers = noise.generate(&mut grid, 100);
         assert!(numbers.iter().enumerate().all(|(i, n)| {
             numbers.iter().enumerate().all(|(j, m)| {
                 let (x1, y1) = n.xy();

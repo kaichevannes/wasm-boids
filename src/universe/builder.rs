@@ -2,7 +2,7 @@ use wasm_bindgen::prelude::*;
 
 use crate::{
     boid_factory::{BlueNoiseBoidFactory, BoidFactory},
-    grid::{Grid, NaiveGrid},
+    grid::{Grid, NaiveGrid, TiledGrid},
 };
 
 use super::Universe;

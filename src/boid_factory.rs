@@ -28,7 +28,7 @@ impl BlueNoiseBoidFactory {
         let mut new_samples_grid = NaiveGrid::new(grid.get_size());
         new_samples_grid.set_points(existing_samples);
         self.noise
-            .generate(&new_samples_grid, number_of_samples_to_generate)
+            .generate(&mut new_samples_grid, number_of_samples_to_generate)
     }
 }
 
