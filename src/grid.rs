@@ -98,9 +98,8 @@ where
     points: Vec<T>,
     hash: HashMap<(u32, u32), Vec<usize>>,
     size: f32,
-    cell_size: f32,
+    tile_size: f32,
 }
-
 impl<T> TiledGrid<T>
 where
     T: Point,
@@ -110,14 +109,14 @@ where
             points: vec![],
             hash: HashMap::new(),
             size,
-            cell_size: 0.0,
+            tile_size: 0.0,
         }
     }
 
     fn tile_coords(&self, point: &dyn Point) -> (u32, u32) {
         let (x, y) = point.xy();
-        let tile_x = (x / self.cell_size).floor() as u32;
-        let tile_y = (y / self.cell_size).floor() as u32;
+        let tile_x = (x / self.tile_size).floor() as u32;
+        let tile_y = (y / self.tile_size).floor() as u32;
         (tile_x, tile_y)
     }
 }
@@ -132,7 +131,7 @@ where
             panic!("Cannot insert ({x},{y}) into grid with size {}", self.size);
         }
 
-        if self.cell_size > 0.0 {
+        if self.tile_size > 0.0 {
             self.hash
                 .entry(self.tile_coords(&point))
                 .or_default()
@@ -143,34 +142,44 @@ where
     }
 
     fn neighbors(&mut self, point: &dyn Point, radius: f32) -> Vec<&T> {
-        if radius > self.cell_size {
-            self.cell_size = radius;
+        if radius > self.tile_size {
+            self.tile_size = radius;
             self.set_points(self.points.to_vec());
         }
         let (x, y) = self.tile_coords(point);
         let mut tiled_points = vec![];
         let mut seen = vec![];
 
-        let tiles_per_axis = (self.size / self.cell_size).floor().max(1.0) as i32;
+        let tiles_per_axis = (self.size / self.tile_size).ceil().max(1.0) as i32;
         for dx in -1..=1 {
             for dy in -1..=1 {
                 let raw_other_tile_x = x as i32 + dx;
-                let other_tile_x = ((raw_other_tile_x + tiles_per_axis) % tiles_per_axis) as u32;
+                let other_tile_x = (raw_other_tile_x + tiles_per_axis) % tiles_per_axis;
                 let raw_other_tile_y = y as i32 + dy;
-                let other_tile_y = ((raw_other_tile_y + tiles_per_axis) % tiles_per_axis) as u32;
+                let other_tile_y = (raw_other_tile_y + tiles_per_axis) % tiles_per_axis;
 
-                if let Some(indices) = self.hash.get(&(other_tile_x, other_tile_y)) {
-                    // Sometimes if the radius is very large, a neighboring tiles can be calculated
-                    // to be the same.
-                    if seen.contains(&(other_tile_x, other_tile_y)) {
-                        continue;
-                    }
-                    for &idx in indices {
-                        if let Some(point) = self.points.get(idx) {
-                            tiled_points.push(point);
+                // Final column can be narrower than self.tile_size so we need to also check 1 left
+                // of it.
+                let mut tiles_to_check = vec![(other_tile_x as u32, other_tile_y as u32)];
+                if other_tile_x >= tiles_per_axis - 1 {
+                    tiles_to_check.push(((other_tile_x - 1).max(0) as u32, other_tile_y as u32));
+                    tiles_to_check.push((0, other_tile_y as u32));
+                }
+
+                for tile in tiles_to_check {
+                    if let Some(indices) = self.hash.get(&tile) {
+                        let (current_x, current_y) = tile;
+                        // Sometimes if the radius is very large, a neighboring tiles can be calculated
+                        // to be the same.
+                        if !seen.contains(&(current_x, current_y)) {
+                            for &idx in indices {
+                                if let Some(point) = self.points.get(idx) {
+                                    tiled_points.push(point);
+                                }
+                            }
+                            seen.push((current_x, current_y));
                         }
                     }
-                    seen.push((other_tile_x, other_tile_y));
                 }
             }
         }
@@ -252,14 +261,14 @@ mod tests {
         let p3 = TestPoint(0.0, 1.0);
         let p4 = TestPoint(0.0, 2.0);
         grid.set_points(vec![p3.clone(), p4.clone()]);
-        assert_eq!(vec![&p4], grid.neighbors(&p3, 1.0));
-        assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
+        assert_eq!(vec![&p4], grid.neighbors(&p3, 1.2));
+        assert_eq!(vec![&p3], grid.neighbors(&p4, 1.3));
 
         let p5 = TestPoint(12.5, 12.5);
         let p6 = TestPoint(13.0, 13.0);
         grid.set_points(vec![p5.clone(), p6.clone()]);
-        assert_eq!(vec![&p6], grid.neighbors(&p5, 1.0));
-        assert_eq!(vec![&p5], grid.neighbors(&p6, 1.0));
+        assert_eq!(vec![&p6], grid.neighbors(&p5, 0.9));
+        assert_eq!(vec![&p5], grid.neighbors(&p6, 1.2));
 
         let p7 = TestPoint(50.0, 50.0);
         grid.set_points(vec![
@@ -273,14 +282,14 @@ mod tests {
         ]);
         assert_eq!(
             1,
-            grid.neighbors(&p1, 1.0)
+            grid.neighbors(&p1, 1.7)
                 .iter()
                 .filter(|&&n| n == &p2)
                 .count()
         );
         assert_eq!(
             1,
-            grid.neighbors(&p1, 1.0)
+            grid.neighbors(&p1, 1.05)
                 .iter()
                 .filter(|&&n| n == &p3)
                 .count()
@@ -293,7 +302,7 @@ mod tests {
         );
     }
 
-    // #[test_case(Box::new(NaiveGrid::new(10.0)) ; "NaiveGrid")]
+    #[test_case(Box::new(NaiveGrid::new(10.0)) ; "NaiveGrid")]
     #[test_case(Box::new(TiledGrid::new(10.0)) ; "TiledGrid")]
     fn detects_neighbors_wrapping_around_the_grid(mut grid: Box<dyn Grid<TestPoint>>) {
         // Left/right wrapping
@@ -301,14 +310,14 @@ mod tests {
         let p2 = TestPoint(9.0, 5.0);
         grid.insert(p1.clone());
         grid.insert(p2.clone());
-        assert_eq!(vec![&p2], grid.neighbors(&p1, 2.0));
-        assert_eq!(vec![&p1], grid.neighbors(&p2, 2.0));
+        assert_eq!(vec![&p2], grid.neighbors(&p1, 2.1));
+        assert_eq!(vec![&p1], grid.neighbors(&p2, 2.3));
 
         // Top/bottom wrapping
         let p3 = TestPoint(5.0, 9.0);
         let p4 = TestPoint(5.0, 1.0);
         grid.set_points(vec![p3.clone(), p4.clone()]);
-        assert_eq!(vec![&p4], grid.neighbors(&p3, 2.0));
+        assert_eq!(vec![&p4], grid.neighbors(&p3, 2.7));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 2.0));
     }
 
@@ -319,13 +328,13 @@ mod tests {
         let p2 = TestPoint(2.0, 2.0);
         grid.insert(p1.clone());
         grid.insert(p1.clone());
-        assert_eq!(vec![&p2], grid.neighbors(&p1, 1.0));
-        assert_eq!(vec![&p1], grid.neighbors(&p2, 1.0));
+        assert_eq!(vec![&p2], grid.neighbors(&p1, 1.2));
+        assert_eq!(vec![&p1], grid.neighbors(&p2, 1.6));
 
         let p3 = TestPoint(0.0, 0.0);
         let p4 = TestPoint(0.0, 0.0);
         grid.set_points(vec![p3.clone(), p4.clone()]);
-        assert_eq!(vec![&p4], grid.neighbors(&p3, 1.0));
+        assert_eq!(vec![&p4], grid.neighbors(&p3, 1.9));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
     }
 
