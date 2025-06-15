@@ -1,6 +1,7 @@
 use wasm_bindgen::prelude::*;
 
 use crate::{
+    boid::Boid,
     boid_factory::{BlueNoiseBoidFactory, BoidFactory},
     grid::{Grid, NaiveGrid, TiledGrid},
 };
@@ -28,6 +29,8 @@ pub struct Builder {
     separation_radius: Option<f32>,
     maximum_velocity: Option<f32>,
     boid_factory: Box<dyn BoidFactory>,
+    naive: bool,
+    multithreaded: bool,
 }
 
 #[wasm_bindgen]
@@ -130,11 +133,20 @@ impl Builder {
         self
     }
 
+    pub fn naive(mut self, naive: bool) -> Self {
+        self.naive = naive;
+        self
+    }
+
+    pub fn multithreaded(mut self, multithreaded: bool) -> Self {
+        self.multithreaded = multithreaded;
+        self
+    }
+
     pub fn build(mut self) -> Universe {
         let number_of_boids = self
             .number_of_boids
             .expect("Missing field: number_of_boids");
-        let mut grid;
         let attraction_weighting = self
             .attraction_weighting
             .expect("Must provide attraction_weighting");
@@ -160,8 +172,12 @@ impl Builder {
                     .powi(2)
         });
 
-        grid = NaiveGrid::new((number_of_boids as f32 / density).sqrt());
-        grid.set_points(self.boid_factory.create_n(&grid, number_of_boids));
+        let mut grid: Box<dyn Grid<Boid>> = if self.naive {
+            Box::new(NaiveGrid::new((number_of_boids as f32 / density).sqrt()))
+        } else {
+            Box::new(TiledGrid::new((number_of_boids as f32 / density).sqrt()))
+        };
+        grid.set_points(self.boid_factory.create_n(&*grid, number_of_boids));
         Universe {
             noise_rng: rand::rng(),
             noise_fraction: self.noise_fraction.expect("Must provide noise_fraction"),
@@ -181,7 +197,8 @@ impl Builder {
                 .maximum_velocity
                 .expect("Must provide a maximum_velocity"),
             boid_factory: self.boid_factory,
-            grid: Box::new(grid),
+            grid,
+            multithreaded: self.multithreaded,
         }
     }
 }
@@ -208,6 +225,8 @@ impl Default for Builder {
             alignment_radius: None,
             separation_radius: None,
             maximum_velocity: None,
+            naive: false,
+            multithreaded: true,
         }
     }
 }

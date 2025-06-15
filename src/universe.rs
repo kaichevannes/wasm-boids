@@ -1,5 +1,7 @@
 pub mod builder;
 
+use std::sync::mpsc;
+
 use crate::{
     boid::{Boid, Vec2},
     boid_factory::BoidFactory,
@@ -22,6 +24,7 @@ pub struct Universe {
     grid: Box<dyn Grid<Boid>>,
     boid_factory: Box<dyn BoidFactory>,
     noise_rng: ThreadRng,
+    multithreaded: bool,
 }
 
 #[wasm_bindgen]
@@ -47,52 +50,17 @@ impl Universe {
     /// This will perform a state update for every Boid in the universe.
     pub fn tick(&mut self) {
         let mut boids = Vec::new();
-        let boids_to_iterate_over: Vec<Boid> = self.grid.get_points().iter().cloned().collect();
+        let boids_to_iterate_over: Vec<Boid> = self.grid.get_points().to_vec();
+
+        // let (tx, rx) = mpsc::channel();
+
         for boid in boids_to_iterate_over {
-            let noise_deduction = self.noise_fraction / 3.0;
-            let noise_accelereation = Vec2(
-                self.noise_rng.random_range(-1.0..1.0),
-                self.noise_rng.random_range(-1.0..1.0),
-            );
-            let acceleration = boid.acceleration
-                + self.attraction_acceleration(&boid)
-                    * (self.attraction_weighting - noise_deduction)
-                + self.alignment_acceleration(&boid) * (self.alignment_weighting - noise_deduction)
-                + self.separation_acceleration(&boid)
-                    * (self.separation_weighting - noise_deduction)
-                + noise_accelereation * self.noise_fraction;
-
-            let velocity = {
-                let raw_velocity = boid.velocity + acceleration;
-                let speed = raw_velocity.magnitude();
-
-                if speed < self.maximum_velocity {
-                    raw_velocity
-                } else if speed > 0.0 {
-                    raw_velocity / speed * self.maximum_velocity
-                } else {
-                    Vec2(0.0, 0.0)
-                }
-            };
-
-            let position = {
-                // The first % grid_size ensures we are in the bounds of [-grid_size, grid_size].
-                // Then we add the grid_size to ensure we have a positive value (e.g. we can have a
-                // value of -3.0 here which given a grid_size of 10.0 will become 7.0) and % again to
-                // ensure values above grid_size are put back into the grid (i.e. if before we had
-                // positive 3.0, adding 10 gives us 13.0. We need this to be within [0, grid_size]
-                // so we modulo the grid size to get 3.0).
-                let grid_size = self.grid.get_size();
-                let raw_position = boid.position + velocity;
-                (raw_position % grid_size + grid_size) % grid_size
-            };
-
-            boids.push(Boid {
-                position,
-                velocity,
-                acceleration,
-            });
+            boids.push(self.process_boid(boid));
         }
+
+        // for received in rx {
+        //     boids.push(received);
+        // }
         self.grid.set_points(boids);
     }
 
@@ -145,6 +113,50 @@ impl Universe {
 
     pub fn set_seperation_radius(&mut self, radius: f32) {
         self.separation_radius = radius.max(0.0);
+    }
+
+    fn process_boid(&mut self, boid: Boid) -> Boid {
+        let noise_deduction = self.noise_fraction / 3.0;
+        let noise_accelereation = Vec2(
+            self.noise_rng.random_range(-1.0..1.0),
+            self.noise_rng.random_range(-1.0..1.0),
+        );
+        let acceleration = boid.acceleration
+            + self.attraction_acceleration(&boid) * (self.attraction_weighting - noise_deduction)
+            + self.alignment_acceleration(&boid) * (self.alignment_weighting - noise_deduction)
+            + self.separation_acceleration(&boid) * (self.separation_weighting - noise_deduction)
+            + noise_accelereation * self.noise_fraction;
+
+        let velocity = {
+            let raw_velocity = boid.velocity + acceleration;
+            let speed = raw_velocity.magnitude();
+
+            if speed < self.maximum_velocity {
+                raw_velocity
+            } else if speed > 0.0 {
+                raw_velocity / speed * self.maximum_velocity
+            } else {
+                Vec2(0.0, 0.0)
+            }
+        };
+
+        let position = {
+            // The first % grid_size ensures we are in the bounds of [-grid_size, grid_size].
+            // Then we add the grid_size to ensure we have a positive value (e.g. we can have a
+            // value of -3.0 here which given a grid_size of 10.0 will become 7.0) and % again to
+            // ensure values above grid_size are put back into the grid (i.e. if before we had
+            // positive 3.0, adding 10 gives us 13.0. We need this to be within [0, grid_size]
+            // so we modulo the grid size to get 3.0).
+            let grid_size = self.grid.get_size();
+            let raw_position = boid.position + velocity;
+            (raw_position % grid_size + grid_size) % grid_size
+        };
+
+        Boid {
+            position,
+            velocity,
+            acceleration,
+        }
     }
 
     fn reweight(&mut self) {
