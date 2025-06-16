@@ -1,6 +1,7 @@
 pub mod builder;
 
-use std::sync::mpsc;
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+use std::{sync::mpsc, thread};
 
 use crate::{
     boid::{Boid, Vec2},
@@ -23,7 +24,6 @@ pub struct Universe {
     maximum_velocity: f32,
     grid: Box<dyn Grid<Boid>>,
     boid_factory: Box<dyn BoidFactory>,
-    noise_rng: ThreadRng,
     multithreaded: bool,
 }
 
@@ -49,18 +49,53 @@ impl Universe {
     ///
     /// This will perform a state update for every Boid in the universe.
     pub fn tick(&mut self) {
-        let mut boids = Vec::new();
         let boids_to_iterate_over: Vec<Boid> = self.grid.get_points().to_vec();
 
-        // let (tx, rx) = mpsc::channel();
+        let boids: Vec<Boid> = if self.multithreaded {
+            boids_to_iterate_over
+                .into_par_iter()
+                .map_init(
+                    || (rand::rng(), self.grid.clone()),
+                    |(rng, grid), boid| {
+                        Universe::process_boid(
+                            boid,
+                            rng,
+                            grid,
+                            self.noise_fraction,
+                            self.attraction_radius,
+                            self.attraction_weighting,
+                            self.alignment_radius,
+                            self.alignment_weighting,
+                            self.separation_radius,
+                            self.separation_weighting,
+                            self.maximum_velocity,
+                        )
+                    },
+                )
+                .collect()
+        } else {
+            let mut rng = rand::rng();
+            let mut grid = self.grid.clone();
+            boids_to_iterate_over
+                .into_iter()
+                .map(|boid| {
+                    Universe::process_boid(
+                        boid,
+                        &mut rng,
+                        &mut grid,
+                        self.noise_fraction,
+                        self.attraction_radius,
+                        self.attraction_weighting,
+                        self.alignment_radius,
+                        self.alignment_weighting,
+                        self.separation_radius,
+                        self.separation_weighting,
+                        self.maximum_velocity,
+                    )
+                })
+                .collect()
+        };
 
-        for boid in boids_to_iterate_over {
-            boids.push(self.process_boid(boid));
-        }
-
-        // for received in rx {
-        //     boids.push(received);
-        // }
         self.grid.set_points(boids);
     }
 
@@ -115,26 +150,47 @@ impl Universe {
         self.separation_radius = radius.max(0.0);
     }
 
-    fn process_boid(&mut self, boid: Boid) -> Boid {
-        let noise_deduction = self.noise_fraction / 3.0;
-        let noise_accelereation = Vec2(
-            self.noise_rng.random_range(-1.0..1.0),
-            self.noise_rng.random_range(-1.0..1.0),
-        );
+    fn process_boid(
+        boid: Boid,
+        rng: &mut ThreadRng,
+        grid: &mut Box<dyn Grid<Boid>>,
+        noise_fraction: f32,
+        attraction_radius: f32,
+        attraction_weighting: f32,
+        alignment_radius: f32,
+        alignment_weighting: f32,
+        separation_radius: f32,
+        separation_weighting: f32,
+        maximum_velocity: f32,
+    ) -> Boid {
+        let noise_deduction = noise_fraction / 3.0;
+        let noise_accelereation =
+            Vec2(rng.random_range(-1.0..1.0), rng.random_range(-1.0..1.0)) * noise_fraction;
+
+        let attraction_acceleration =
+            Universe::attraction_acceleration(&boid, grid, attraction_radius)
+                * (attraction_weighting - noise_deduction);
+        let alignment_acceleration =
+            Universe::alignment_acceleration(&boid, grid, alignment_radius)
+                * (alignment_weighting - noise_deduction);
+        let separation_acceleration =
+            Universe::separation_acceleration(&boid, grid, separation_radius)
+                * (separation_weighting - noise_deduction);
+
         let acceleration = boid.acceleration
-            + self.attraction_acceleration(&boid) * (self.attraction_weighting - noise_deduction)
-            + self.alignment_acceleration(&boid) * (self.alignment_weighting - noise_deduction)
-            + self.separation_acceleration(&boid) * (self.separation_weighting - noise_deduction)
-            + noise_accelereation * self.noise_fraction;
+            + attraction_acceleration
+            + alignment_acceleration
+            + separation_acceleration
+            + noise_accelereation;
 
         let velocity = {
             let raw_velocity = boid.velocity + acceleration;
             let speed = raw_velocity.magnitude();
 
-            if speed < self.maximum_velocity {
+            if speed < maximum_velocity {
                 raw_velocity
             } else if speed > 0.0 {
-                raw_velocity / speed * self.maximum_velocity
+                raw_velocity / speed * maximum_velocity
             } else {
                 Vec2(0.0, 0.0)
             }
@@ -147,7 +203,7 @@ impl Universe {
             // ensure values above grid_size are put back into the grid (i.e. if before we had
             // positive 3.0, adding 10 gives us 13.0. We need this to be within [0, grid_size]
             // so we modulo the grid size to get 3.0).
-            let grid_size = self.grid.get_size();
+            let grid_size = grid.get_size();
             let raw_position = boid.position + velocity;
             (raw_position % grid_size + grid_size) % grid_size
         };
@@ -167,9 +223,13 @@ impl Universe {
         self.separation_weighting /= total_weighting;
     }
 
-    fn attraction_acceleration(&mut self, boid: &Boid) -> Vec2 {
-        let grid_size = self.grid.get_size();
-        let neighbors = self.grid.neighbors(boid, self.attraction_radius);
+    fn attraction_acceleration(
+        boid: &Boid,
+        grid: &mut Box<dyn Grid<Boid>>,
+        attraction_radius: f32,
+    ) -> Vec2 {
+        let grid_size = grid.get_size();
+        let neighbors = grid.neighbors(boid, attraction_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
         }
@@ -181,8 +241,12 @@ impl Universe {
         average_position - boid.position
     }
 
-    fn alignment_acceleration(&mut self, boid: &Boid) -> Vec2 {
-        let neighbors = self.grid.neighbors(boid, self.alignment_radius);
+    fn alignment_acceleration(
+        boid: &Boid,
+        grid: &mut Box<dyn Grid<Boid>>,
+        alignment_radius: f32,
+    ) -> Vec2 {
+        let neighbors = grid.neighbors(boid, alignment_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
         }
@@ -194,9 +258,13 @@ impl Universe {
         average_velocity - boid.velocity
     }
 
-    fn separation_acceleration(&mut self, boid: &Boid) -> Vec2 {
-        let grid_size = self.grid.get_size();
-        let neighbors = self.grid.neighbors(boid, self.separation_radius);
+    fn separation_acceleration(
+        boid: &Boid,
+        grid: &mut Box<dyn Grid<Boid>>,
+        separation_radius: f32,
+    ) -> Vec2 {
+        let grid_size = grid.get_size();
+        let neighbors = grid.neighbors(boid, separation_radius);
         if neighbors.is_empty() {
             return Vec2(0.0, 0.0);
         }
@@ -213,7 +281,6 @@ impl Universe {
         let (x2, y2) = other.into();
 
         let adjusted_axis = |a: f32, b: f32| {
-            let grid_size = grid_size;
             let difference_between_coordinates = b - a;
             let half_the_size_of_the_grid = grid_size / 2.0;
 

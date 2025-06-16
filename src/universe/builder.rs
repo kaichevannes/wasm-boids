@@ -179,7 +179,6 @@ impl Builder {
         };
         grid.set_points(self.boid_factory.create_n(&*grid, number_of_boids));
         Universe {
-            noise_rng: rand::rng(),
             noise_fraction: self.noise_fraction.expect("Must provide noise_fraction"),
             attraction_weighting: attraction_weighting as f32 / total_weighting as f32,
             alignment_weighting: alignment_weighting as f32 / total_weighting as f32,

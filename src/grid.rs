@@ -5,7 +5,7 @@ pub trait Point {
     fn set_xy(&mut self, x: f32, y: f32);
 }
 
-pub trait Grid<T>
+pub trait Grid<T>: CloneGrid<T> + Send + Sync
 where
     T: Point,
 {
@@ -17,9 +17,36 @@ where
     fn resize(&mut self, size: f32);
 }
 
-pub struct NaiveGrid<T>
+pub trait CloneGrid<T>
 where
     T: Point,
+{
+    fn clone_grid(&self) -> Box<dyn Grid<T>>;
+}
+
+impl<T, G> CloneGrid<T> for G
+where
+    T: Point,
+    G: Grid<T> + Clone + 'static,
+{
+    fn clone_grid(&self) -> Box<dyn Grid<T>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<T> Clone for Box<dyn Grid<T>>
+where
+    T: Point,
+{
+    fn clone(&self) -> Self {
+        self.clone_grid()
+    }
+}
+
+#[derive(Clone)]
+pub struct NaiveGrid<T>
+where
+    T: Point + Send + Sync,
 {
     points: Vec<T>,
     /// The width/height of the square grid.
@@ -28,7 +55,7 @@ where
 
 impl<T> NaiveGrid<T>
 where
-    T: Point,
+    T: Point + Send + Sync,
 {
     pub fn new(size: f32) -> Self {
         NaiveGrid {
@@ -40,7 +67,7 @@ where
 
 impl<T> Grid<T> for NaiveGrid<T>
 where
-    T: Point,
+    T: Point + Clone + Send + Sync + 'static,
 {
     fn insert(&mut self, point: T) {
         let (x, y) = point.xy();
@@ -69,16 +96,16 @@ where
             .collect()
     }
 
-    fn get_size(&self) -> f32 {
-        self.size
-    }
-
     fn get_points(&self) -> &[T] {
         &self.points
     }
 
     fn set_points(&mut self, points: Vec<T>) {
         self.points = points;
+    }
+
+    fn get_size(&self) -> f32 {
+        self.size
     }
 
     fn resize(&mut self, size: f32) {
@@ -91,18 +118,20 @@ where
     }
 }
 
+#[derive(Clone)]
 pub struct TiledGrid<T>
 where
-    T: Point,
+    T: Point + Send + Sync,
 {
     points: Vec<T>,
     hash: HashMap<(u32, u32), Vec<usize>>,
     size: f32,
     tile_size: f32,
 }
+
 impl<T> TiledGrid<T>
 where
-    T: Point,
+    T: Point + Send + Sync,
 {
     pub fn new(size: f32) -> Self {
         Self {
@@ -123,7 +152,7 @@ where
 
 impl<T> Grid<T> for TiledGrid<T>
 where
-    T: Point + Clone,
+    T: Point + Clone + Send + Sync + 'static,
 {
     fn insert(&mut self, point: T) {
         let (x, y) = point.xy();
