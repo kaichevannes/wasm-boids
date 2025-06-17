@@ -9,7 +9,7 @@ use crate::{
     grid::Grid,
 };
 use builder::{Builder, Preset};
-use rand::{Rng, rngs::ThreadRng};
+use rand::{rngs::ThreadRng, Rng};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -148,6 +148,42 @@ impl Universe {
 
     pub fn set_seperation_radius(&mut self, radius: f32) {
         self.separation_radius = radius.max(0.0);
+    }
+
+    pub fn get_noise_fraction(&self) -> f32 {
+        self.noise_fraction
+    }
+
+    pub fn get_attraction_weighting(&self) -> f32 {
+        self.attraction_weighting
+    }
+
+    pub fn get_alignment_weighting(&self) -> f32 {
+        self.alignment_weighting
+    }
+
+    pub fn get_separation_weighting(&self) -> f32 {
+        self.separation_weighting
+    }
+
+    pub fn get_attraction_radius(&self) -> f32 {
+        self.attraction_radius
+    }
+
+    pub fn get_alignment_radius(&self) -> f32 {
+        self.alignment_radius
+    }
+
+    pub fn get_separation_radius(&self) -> f32 {
+        self.separation_radius
+    }
+
+    pub fn get_maximum_velocity(&self) -> f32 {
+        self.maximum_velocity
+    }
+
+    pub fn get_multithreaded(&self) -> bool {
+        self.multithreaded
     }
 
     fn process_boid(
@@ -375,12 +411,10 @@ mod tests {
             .iter()
             .map(|boid| boid.position)
             .collect();
-        assert!(
-            original_positions
-                .iter()
-                .zip(updated_positions.iter())
-                .all(|(before, after)| before != after)
-        );
+        assert!(original_positions
+            .iter()
+            .zip(updated_positions.iter())
+            .all(|(before, after)| before != after));
     }
 
     #[test]
