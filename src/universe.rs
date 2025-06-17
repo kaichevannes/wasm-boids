@@ -45,6 +45,10 @@ impl Universe {
         Builder::from_preset(preset).build()
     }
 
+    pub fn get_boids_pointer(&self) -> *const Boid {
+        self.grid.get_points().as_ptr()
+    }
+
     /// Advance time by one tick.
     ///
     /// This will perform a state update for every Boid in the universe.

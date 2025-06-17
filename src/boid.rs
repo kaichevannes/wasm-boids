@@ -1,8 +1,12 @@
 use std::ops::{Add, Div, Mul, Rem, Sub};
 
+use wasm_bindgen::prelude::wasm_bindgen;
+
 use crate::grid::Point;
 
 #[derive(Clone, Debug, Copy)]
+#[repr(C)]
+#[wasm_bindgen]
 pub struct Boid {
     pub position: Vec2,
     pub velocity: Vec2,
@@ -19,6 +23,8 @@ impl Point for Boid {
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]
+#[repr(C)]
+#[wasm_bindgen]
 pub struct Vec2(pub f32, pub f32);
 
 impl Vec2 {
