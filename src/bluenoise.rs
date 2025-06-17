@@ -62,7 +62,7 @@ impl BlueNoise {
         // We rearrange that to get radius = sqtr(n) * number_of_cells
         // let radius = number_of_samples_to_generate as f32 * f32::sqrt(2.0);
         let radius =
-            (grid.get_size() * f32::sqrt(2.0)) / number_of_samples_to_generate.isqrt() as f32;
+            ((grid.get_size() * f32::sqrt(2.0)) / number_of_samples_to_generate as f32).sqrt();
         'outer: while !active_points.is_empty() {
             if samples_generated.len() as u32 >= number_of_samples_to_generate {
                 return samples_generated;
