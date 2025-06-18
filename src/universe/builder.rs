@@ -1,3 +1,4 @@
+extern crate console_error_panic_hook;
 use wasm_bindgen::prelude::*;
 
 use crate::{
@@ -144,6 +145,8 @@ impl Builder {
     }
 
     pub fn build(mut self) -> Universe {
+        console_error_panic_hook::set_once();
+
         let number_of_boids = self
             .number_of_boids
             .expect("Missing field: number_of_boids");

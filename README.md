@@ -13,11 +13,3 @@ Boids implementation in wasm.
     "snippets"
 ],
 ```
-4. Add to the bottom of wasm_boids.js:
-`export const memory = wasm.memory;`
-So we have:
-```
-export const memory = wasm.memory;
-export { initSync };
-export default __wbg_init;
-```
