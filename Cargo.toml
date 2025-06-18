@@ -2,7 +2,7 @@ cargo-features = ["edition2024"]
 
 [package]
 name = "wasm-boids"
-version = "0.2.2"
+version = "0.2.6"
 authors = ["Kai Chevannes <chevannes.kai@gmail.com>"]
 repository = "https://github.com/kaichevannes/wasm-boids"
 edition = "2024"
@@ -16,6 +16,7 @@ rand = "0.9"
 rayon = "1.8"
 wasm-bindgen-rayon = "1.2"
 getrandom = { version = "0.3", features = ["wasm_js"] }
+console_error_panic_hook = "0.1"
 
 [dev-dependencies]
 test-case = "*"

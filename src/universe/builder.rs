@@ -233,9 +233,9 @@ impl Default for Builder {
 #[cfg(test)]
 mod tests {
     use crate::{
-        Universe,
         boid::{Boid, Vec2},
         universe::{self, tests::TestBoidFactory},
+        Universe,
     };
 
     #[test]
@@ -302,12 +302,10 @@ mod tests {
             }))
             .build();
         println!("{:?}", universe.get_boids());
-        assert!(
-            universe
-                .get_boids()
-                .iter()
-                .zip(boids.iter())
-                .all(|(expected, actual)| expected.position == actual.position)
-        )
+        assert!(universe
+            .get_boids()
+            .iter()
+            .zip(boids.iter())
+            .all(|(expected, actual)| expected.position == actual.position))
     }
 }
