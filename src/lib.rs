@@ -7,6 +7,7 @@ pub use universe::Universe;
 
 pub use wasm_bindgen_rayon::init_thread_pool;
 
+use wasm_bindgen::prelude::*;
 extern crate console_error_panic_hook;
 use std::panic;
 
