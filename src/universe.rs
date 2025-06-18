@@ -154,6 +154,10 @@ impl Universe {
         self.separation_radius = radius.max(0.0);
     }
 
+    pub fn get_size(&self) -> f32 {
+        self.grid.get_size()
+    }
+
     pub fn get_number_of_boids(&self) -> u32 {
         self.grid.get_points().len() as u32
     }

@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use crate::grid::{Grid, Point};
 use rand::prelude::*;
 
-const NUMBER_OF_SAMPLES_UNTIL_REJECTION: u32 = 30;
+const NUMBER_OF_SAMPLES_UNTIL_REJECTION: u32 = 50;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Sample(pub f32, pub f32);
@@ -60,9 +60,7 @@ impl BlueNoise {
         // Step 2, Bridson 2007
         // The number of cells in a grid with n dimensions is r / sqrt(n).
         // We rearrange that to get radius = sqtr(n) * number_of_cells
-        // let radius = number_of_samples_to_generate as f32 * f32::sqrt(2.0);
-        let radius =
-            ((grid.get_size() * f32::sqrt(2.0)) / number_of_samples_to_generate as f32).sqrt();
+        let radius = grid.get_size() * (2.0 / number_of_samples_to_generate as f32).sqrt();
         'outer: while !active_points.is_empty() {
             if samples_generated.len() as u32 >= number_of_samples_to_generate {
                 return samples_generated;
@@ -76,10 +74,18 @@ impl BlueNoise {
                 let angle: f32 = self.rng.random_range(0.0..2.0 * PI);
                 // Convert to cartesian coordinates from polar coordinates.
                 // The point must be constrained within the size of the grid.
-                let candidate_point = Sample(
-                    (active_x + r * angle.cos()).clamp(0.0, grid.get_size()),
-                    (active_y + r * angle.sin()).clamp(0.0, grid.get_size()),
-                );
+                let candidate_x = active_x + r * angle.cos();
+                let candidate_y = active_y + r * angle.sin();
+
+                if (candidate_x < 0.0
+                    || candidate_x > grid.get_size()
+                    || candidate_y < 0.0
+                    || candidate_y > grid.get_size())
+                {
+                    continue;
+                }
+
+                let candidate_point = Sample(candidate_x, candidate_y);
                 // Don't add a point that already exists, happens on the clamped values.
                 if samples_generated.contains(&candidate_point) {
                     continue;
