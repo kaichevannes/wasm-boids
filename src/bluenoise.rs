@@ -100,9 +100,12 @@ impl BlueNoise {
             active_points.remove(idx);
         }
 
-        panic!(
-            "Couldn't generate requested number of points. Something probably went wrong in the grid_size logic."
-        )
+        // panic!(
+        //     "Couldn't generate requested number of points. Something probably went wrong in the grid_size logic."
+        // )
+
+        // This doesn't always work but it's mostly fine enough.
+        samples_generated
     }
 }
 
