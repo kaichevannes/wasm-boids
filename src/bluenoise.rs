@@ -106,7 +106,7 @@ impl BlueNoise {
 
         // Not ideal but better than crashing. I'm not sure why this sometimes doesn't work. The
         // algorithm must sometimes fail when applied to an existing set of points.
-        while samples_generated.len() as u32 >= number_of_samples_to_generate {
+        while (samples_generated.len() as u32) < number_of_samples_to_generate {
             let non_blue_point = Sample(
                 self.rng.random_range(0.0..=grid.get_size()),
                 self.rng.random_range(0.0..=grid.get_size()),
