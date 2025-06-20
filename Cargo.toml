@@ -2,7 +2,7 @@ cargo-features = ["edition2024"]
 
 [package]
 name = "wasm-boids"
-version = "0.2.15"
+version = "0.2.17"
 authors = ["Kai Chevannes <chevannes.kai@gmail.com>"]
 repository = "https://github.com/kaichevannes/wasm-boids"
 edition = "2024"

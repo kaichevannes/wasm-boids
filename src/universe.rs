@@ -154,6 +154,10 @@ impl Universe {
         self.separation_radius = radius.max(0.0);
     }
 
+    pub fn set_multithreaded(&mut self, multithreaded: bool) {
+        self.multithreaded = multithreaded;
+    }
+
     pub fn get_size(&self) -> f32 {
         self.grid.get_size()
     }
