@@ -65,7 +65,7 @@ impl BlueNoise {
             // The algorithm is too slow at this point and the randomness doesn't really matter
             // anymore, the grid gets very full now.
             if active_points.len() > 500 {
-                return;
+                break;
             }
 
             if samples_generated.len() as u32 >= number_of_samples_to_generate {
