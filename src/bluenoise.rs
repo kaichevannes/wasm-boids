@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use crate::grid::{Grid, Point};
 use rand::prelude::*;
 
-const NUMBER_OF_SAMPLES_UNTIL_REJECTION: u32 = 50;
+const NUMBER_OF_SAMPLES_UNTIL_REJECTION: u32 = 30;
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Sample(pub f32, pub f32);
@@ -62,6 +62,12 @@ impl BlueNoise {
         // We rearrange that to get radius = sqtr(n) * number_of_cells
         let radius = grid.get_size() * (2.0 / number_of_samples_to_generate as f32).sqrt();
         'outer: while !active_points.is_empty() {
+            // The algorithm is too slow at this point and the randomness doesn't really matter
+            // anymore, the grid gets very full now.
+            if active_points.len() > 500 {
+                return;
+            }
+
             if samples_generated.len() as u32 >= number_of_samples_to_generate {
                 return samples_generated;
             }
