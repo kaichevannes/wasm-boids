@@ -159,6 +159,10 @@ impl Universe {
         self.multithreaded = multithreaded;
     }
 
+    pub fn set_boids_per_thread(&mut self, boids_per_thread: usize) {
+        self.boids_per_thread = boids_per_thread;
+    }
+
     pub fn get_size(&self) -> f32 {
         self.grid.get_size()
     }
