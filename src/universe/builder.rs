@@ -32,6 +32,7 @@ pub struct Builder {
     boid_factory: Box<dyn BoidFactory>,
     naive: bool,
     multithreaded: bool,
+    number_of_boids_per_thread: usize,
 }
 
 #[wasm_bindgen]
@@ -139,6 +140,11 @@ impl Builder {
         self
     }
 
+    pub fn number_of_boids_per_thread(mut self, boids_per_thread: usize) -> Self {
+        self.number_of_boids_per_thread = boids_per_thread;
+        self
+    }
+
     pub fn multithreaded(mut self, multithreaded: bool) -> Self {
         self.multithreaded = multithreaded;
         self
@@ -158,6 +164,8 @@ impl Builder {
             .separation_weighting
             .expect("Must provide separation_weighting");
         let mut total_weighting = attraction_weighting + alignment_weighting + separation_weighting;
+        // To prevent divide by zero error. This only happens when all weightings are zero so the
+        // result will be zero anyway.
         if total_weighting == 0 {
             total_weighting = 1;
         }
@@ -199,6 +207,7 @@ impl Builder {
             boid_factory: self.boid_factory,
             grid,
             multithreaded: self.multithreaded,
+            boids_per_thread: self.number_of_boids_per_thread,
         }
     }
 }
@@ -227,6 +236,7 @@ impl Default for Builder {
             maximum_velocity: None,
             naive: false,
             multithreaded: true,
+            number_of_boids_per_thread: 200,
         }
     }
 }

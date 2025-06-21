@@ -20,3 +20,8 @@ console_error_panic_hook = "0.1"
 
 [dev-dependencies]
 test-case = "*"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "my_benchmark"
+harness = false

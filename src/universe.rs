@@ -1,7 +1,6 @@
 pub mod builder;
 
-use rayon::iter::{IntoParallelIterator, ParallelIterator};
-use std::{sync::mpsc, thread};
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 use crate::{
     boid::{Boid, Vec2},
@@ -25,6 +24,7 @@ pub struct Universe {
     grid: Box<dyn Grid<Boid>>,
     boid_factory: Box<dyn BoidFactory>,
     multithreaded: bool,
+    boids_per_thread: usize,
 }
 
 #[wasm_bindgen]
@@ -58,6 +58,7 @@ impl Universe {
         let boids: Vec<Boid> = if self.multithreaded {
             boids_to_iterate_over
                 .into_par_iter()
+                .with_min_len(self.boids_per_thread)
                 .map_init(
                     || (rand::rng(), self.grid.clone()),
                     |(rng, grid), boid| {
