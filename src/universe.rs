@@ -207,6 +207,10 @@ impl Universe {
         self.multithreaded
     }
 
+    pub fn get_boids_per_thread(&self) -> usize {
+        self.boids_per_thread
+    }
+
     fn process_boid(
         boid: Boid,
         rng: &mut ThreadRng,
