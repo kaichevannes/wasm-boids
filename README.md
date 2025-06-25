@@ -1,3 +1,5 @@
+# Merged into react-boids
+
 Boids implementation in wasm.
 
 ## Publishing

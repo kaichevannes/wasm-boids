@@ -64,7 +64,7 @@ impl BlueNoise {
         'outer: while !active_points.is_empty() {
             // The algorithm is too slow at this point and the randomness doesn't really matter
             // anymore, the grid gets very full now.
-            if active_points.len() > 500 {
+            if active_points.len() > 250 {
                 break;
             }
 

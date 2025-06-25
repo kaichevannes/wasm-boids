@@ -1,5 +1,7 @@
 pub mod builder;
 
+use std::sync::Arc;
+
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 
 use crate::{
@@ -54,6 +56,7 @@ impl Universe {
     /// This will perform a state update for every Boid in the universe.
     pub fn tick(&mut self) {
         let boids_to_iterate_over: Vec<Boid> = self.grid.get_points().to_vec();
+        let grid = Arc::new(self.grid.clone());
 
         let boids: Vec<Boid> = if self.multithreaded {
             boids_to_iterate_over
