@@ -657,6 +657,7 @@ dependencies = [
  "test-case",
  "wasm-bindgen",
  "wasm-bindgen-rayon",
+ "web-sys",
 ]
 
 [[package]]

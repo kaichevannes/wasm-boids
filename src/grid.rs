@@ -5,45 +5,19 @@ pub trait Point {
     fn set_xy(&mut self, x: f32, y: f32);
 }
 
-pub trait Grid<T>: CloneGrid<T> + Send + Sync
+pub trait Grid<T>: Send + Sync
 where
     T: Point,
 {
+    fn prepare(&mut self, max_radius: f32);
     fn insert(&mut self, point: T);
-    fn neighbors(&mut self, point: &dyn Point, radius: f32) -> Vec<&T>;
+    fn neighbors(&self, point: &dyn Point, radius: f32) -> Vec<&T>;
     fn get_points(&self) -> &[T];
     fn set_points(&mut self, points: Vec<T>);
     fn get_size(&self) -> f32;
     fn resize(&mut self, size: f32);
 }
 
-pub trait CloneGrid<T>
-where
-    T: Point,
-{
-    fn clone_grid(&self) -> Box<dyn Grid<T>>;
-}
-
-impl<T, G> CloneGrid<T> for G
-where
-    T: Point,
-    G: Grid<T> + Clone + 'static,
-{
-    fn clone_grid(&self) -> Box<dyn Grid<T>> {
-        Box::new(self.clone())
-    }
-}
-
-impl<T> Clone for Box<dyn Grid<T>>
-where
-    T: Point,
-{
-    fn clone(&self) -> Self {
-        self.clone_grid()
-    }
-}
-
-#[derive(Clone)]
 pub struct NaiveGrid<T>
 where
     T: Point + Send + Sync,
@@ -69,6 +43,8 @@ impl<T> Grid<T> for NaiveGrid<T>
 where
     T: Point + Clone + Send + Sync + 'static,
 {
+    fn prepare(&mut self, _max_radius: f32) {}
+
     fn insert(&mut self, point: T) {
         let (x, y) = point.xy();
         if x < 0.0 || y < 0.0 || x > self.size || y > self.size {
@@ -77,7 +53,7 @@ where
         self.points.push(point);
     }
 
-    fn neighbors(&mut self, point: &dyn Point, radius: f32) -> Vec<&T> {
+    fn neighbors(&self, point: &dyn Point, radius: f32) -> Vec<&T> {
         let (ax, ay) = point.xy();
         let mut found_self = false;
         self.points
@@ -118,7 +94,6 @@ where
     }
 }
 
-#[derive(Clone)]
 pub struct TiledGrid<T>
 where
     T: Point + Send + Sync,
@@ -154,6 +129,13 @@ impl<T> Grid<T> for TiledGrid<T>
 where
     T: Point + Clone + Send + Sync + 'static,
 {
+    fn prepare(&mut self, max_radius: f32) {
+        if max_radius > self.tile_size {
+            self.tile_size = max_radius;
+            self.set_points(self.points.to_vec());
+        }
+    }
+
     fn insert(&mut self, point: T) {
         let (x, y) = point.xy();
         if x < 0.0 || y < 0.0 || x > self.size || y > self.size {
@@ -170,11 +152,7 @@ where
         self.points.push(point);
     }
 
-    fn neighbors(&mut self, point: &dyn Point, radius: f32) -> Vec<&T> {
-        if radius > self.tile_size {
-            self.tile_size = radius;
-            self.set_points(self.points.to_vec());
-        }
+    fn neighbors(&self, point: &dyn Point, radius: f32) -> Vec<&T> {
         let (x, y) = self.tile_coords(point);
         let mut tiled_points = vec![];
         let mut seen = vec![];
@@ -283,6 +261,7 @@ mod tests {
         let p2 = TestPoint(1.0, 0.0);
         grid.insert(p1.clone());
         grid.insert(p2.clone());
+        grid.prepare(1.0);
         assert_eq!(1, grid.neighbors(&p1, 1.0).len());
         assert_eq!(vec![&p2], grid.neighbors(&p1, 1.0));
         assert_eq!(vec![&p1], grid.neighbors(&p2, 1.0));
@@ -290,12 +269,14 @@ mod tests {
         let p3 = TestPoint(0.0, 1.0);
         let p4 = TestPoint(0.0, 2.0);
         grid.set_points(vec![p3.clone(), p4.clone()]);
+        grid.prepare(1.3);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 1.2));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 1.3));
 
         let p5 = TestPoint(12.5, 12.5);
         let p6 = TestPoint(13.0, 13.0);
         grid.set_points(vec![p5.clone(), p6.clone()]);
+        grid.prepare(1.2);
         assert_eq!(vec![&p6], grid.neighbors(&p5, 0.9));
         assert_eq!(vec![&p5], grid.neighbors(&p6, 1.2));
 
@@ -309,6 +290,7 @@ mod tests {
             p6.clone(),
             p7.clone(),
         ]);
+        grid.prepare(200.0);
         assert_eq!(
             1,
             grid.neighbors(&p1, 1.7)
@@ -339,6 +321,7 @@ mod tests {
         let p2 = TestPoint(9.0, 5.0);
         grid.insert(p1.clone());
         grid.insert(p2.clone());
+        grid.prepare(2.3);
         assert_eq!(vec![&p2], grid.neighbors(&p1, 2.1));
         assert_eq!(vec![&p1], grid.neighbors(&p2, 2.3));
 
@@ -346,6 +329,7 @@ mod tests {
         let p3 = TestPoint(5.0, 9.0);
         let p4 = TestPoint(5.0, 1.0);
         grid.set_points(vec![p3.clone(), p4.clone()]);
+        grid.prepare(2.7);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 2.7));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 2.0));
     }
@@ -357,12 +341,14 @@ mod tests {
         let p2 = TestPoint(2.0, 2.0);
         grid.insert(p1.clone());
         grid.insert(p1.clone());
+        grid.prepare(1.6);
         assert_eq!(vec![&p2], grid.neighbors(&p1, 1.2));
         assert_eq!(vec![&p1], grid.neighbors(&p2, 1.6));
 
         let p3 = TestPoint(0.0, 0.0);
         let p4 = TestPoint(0.0, 0.0);
         grid.set_points(vec![p3.clone(), p4.clone()]);
+        grid.prepare(1.9);
         assert_eq!(vec![&p4], grid.neighbors(&p3, 1.9));
         assert_eq!(vec![&p3], grid.neighbors(&p4, 1.0));
     }
